@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'all_menu_screen.dart';
 import 'favorites_screen.dart';
+import 'filter_screen.dart';
 
 // 홈 화면
 class HomeScreen extends StatelessWidget {
@@ -91,7 +92,14 @@ class HomeScreen extends StatelessWidget {
             SizedBox(
               height: 54,
               child: OutlinedButton(
-                onPressed: () => moveTo(context, '조건 골라 추천'),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const FilterScreen(),
+                    ),
+                  );
+                },
                 child: const Text('조건 골라 추천'),
               ),
             ),

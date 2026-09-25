@@ -12,7 +12,7 @@ class ZipbobApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '집밥픽',
+      title: '집밥PICK',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
