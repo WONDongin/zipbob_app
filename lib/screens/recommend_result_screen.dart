@@ -3,7 +3,7 @@ import 'filter_screen.dart';
 import 'recipe_screen.dart';
 
 class RecommendResultScreen extends StatefulWidget {
-  final String category;
+  final String? category;
   final List<String> features;
 
   const RecommendResultScreen({
@@ -51,9 +51,12 @@ class _RecommendResultScreenState extends State<RecommendResultScreen> {
     final currentMenu = _sampleData[_currentIndex];
 
     // 선택된 태그 목록 (전달받은 태그 or 메뉴 태그)
-    final displayTags = widget.features.isNotEmpty
-        ? [widget.category, ...widget.features]
-        : (currentMenu['tags'] as List<String>);
+    final List<String> displayTags = widget.features.isNotEmpty
+    ? [
+        if (widget.category != null) widget.category!,
+        ...widget.features,
+      ]
+    : (currentMenu['tags'] as List<String>);
 
     return Scaffold(
       backgroundColor: Colors.white,
