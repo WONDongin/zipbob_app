@@ -4,7 +4,6 @@ class MenuFilter {
   final String category;
   final String categoryName;
   final String description;
-  final String? imageUrl;
   final List<MenuTag> tags;
 
   MenuFilter({
@@ -13,7 +12,6 @@ class MenuFilter {
     required this.category,
     required this.categoryName,
     required this.description,
-    this.imageUrl,
     required this.tags,
   });
 
@@ -24,7 +22,6 @@ class MenuFilter {
       category: json['category'],
       categoryName: json['categoryName'],
       description: json['description'],
-      imageUrl: json['imageUrl'],
       tags: (json['tags'] as List<dynamic>?)
               ?.map((tag) => MenuTag.fromJson(tag))
               .toList() ??
