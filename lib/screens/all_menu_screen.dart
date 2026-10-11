@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../models/all_menu_screen_model.dart';
+import '../models/code.dart';
 import '../services/all_menu_screen_service.dart';
+import '../services/code_service.dart';
+import '../services/like_service.dart';
 import 'recipe_screen.dart';
 
 // 전체 메뉴 화면
@@ -13,35 +16,33 @@ class AllMenuScreen extends StatefulWidget {
 }
 
 class _AllMenuScreenState extends State<AllMenuScreen> {
-  final _service = AllMenuScreenService();
+  final _menuService = AllMenuScreenService();
+  final _codeService = CodeService();
+  final _likeService = LikeService();
 
-  // 검색창에 입력된 값 읽기·지우기
   final _searchController = TextEditingController();
 
+  // API 조회 결과
+  late Future<List<Code>> _categoriesFuture;
   late Future<List<AllMenuScreenModel>> _menusFuture;
 
-  // 빈 문자열은 전체 카테고리
+  // 빈 문자열이면 전체 카테고리
   String _selectedCategory = '';
 
-  // 상단 버튼 목록: 추후 공통코드 목록 API로 변경
-  static const _categories = <String, String>{
-    '': '전체',
-    'rice_bowl': '덮밥·비빔밥',
-    'fried_rice': '볶음밥',
-    'noodle': '면 요리',
-    'soup_stew': '국·찌개',
-    'stir_fry_grill': '볶음·구이',
-    'steam_braise': '찜·조림',
-    'toast_sandwich': '토스트·샌드위치',
-    'salad_simple': '샐러드·간편식',
-  };
+  // 즐겨찾기에 등록된 메뉴 ID
+  final Set<int> _favoriteMenuIds = {};
+
+  // 등록·삭제 요청이 진행 중인 메뉴 ID
+  final Set<int> _updatingMenuIds = {};
+
+  bool _favoritesLoaded = false;
 
   @override
   void initState() {
     super.initState();
 
-    // 화면을 처음 열면 전체 메뉴 조회
-    _menusFuture = _service.fetchMenus();
+    _categoriesFuture = _fetchCategories();
+    _menusFuture = _fetchMenus();
   }
 
   @override
@@ -50,32 +51,225 @@ class _AllMenuScreenState extends State<AllMenuScreen> {
     super.dispose();
   }
 
+  // 기존 공통코드 서비스를 재사용
+  Future<List<Code>> _fetchCategories() {
+    return _codeService.getCategoryCodes().timeout(const Duration(seconds: 15));
+  }
+
+  // 상세 화면에서 돌아오면 즐겨찾기 상태를 다시 조회
+  Future<void> _openRecipe(AllMenuScreenModel menu) async {
+    // 목록에서 진행 중인 변경 요청과 겹치지 않도록 처리
+    if (_updatingMenuIds.isNotEmpty) {
+      return;
+    }
+
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            RecipeScreen(menuId: menu.menuId, menuName: menu.menuName),
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      // 다음 조회에서 메뉴와 즐겨찾기를 함께 다시 불러온다.
+      _favoritesLoaded = false;
+      _menusFuture = _fetchMenus();
+    });
+  }
+
+  // 처음에는 메뉴 목록과 즐겨찾기 상태를 함께 조회한다.
+  // 이후 검색에서는 메뉴 목록만 다시 조회한다.
+  Future<List<AllMenuScreenModel>> _fetchMenus() async {
+    final keyword = _searchController.text;
+    final category = _selectedCategory;
+
+    if (_favoritesLoaded) {
+      return _menuService.fetchMenus(keyword: keyword, category: category);
+    }
+
+    final results = await Future.wait<List<AllMenuScreenModel>>([
+      _menuService.fetchMenus(keyword: keyword, category: category),
+      _likeService.fetchFavorites(),
+    ]);
+
+    if (!mounted) {
+      return results[0];
+    }
+
+    _favoriteMenuIds
+      ..clear()
+      ..addAll(results[1].map((menu) => menu.menuId));
+
+    _favoritesLoaded = true;
+
+    return results[0];
+  }
+
+  // 검색 및 메뉴 목록 재시도
   void _search() {
     FocusScope.of(context).unfocus();
 
     setState(() {
-      _menusFuture = _service.fetchMenus(
-        keyword: _searchController.text,
-        category: _selectedCategory,
-      );
+      _menusFuture = _fetchMenus();
     });
   }
 
-  void _selectCategory(String category) {
+  // 카테고리 선택 후 현재 검색어와 함께 조회
+  void _selectCategory(String categoryId) {
     FocusScope.of(context).unfocus();
 
     setState(() {
-      _selectedCategory = category;
-      _menusFuture = _service.fetchMenus(
-        keyword: _searchController.text,
-        category: category,
-      );
+      _selectedCategory = categoryId;
+      _menusFuture = _fetchMenus();
     });
   }
 
   void _clearSearch() {
     _searchController.clear();
     _search();
+  }
+
+  // 카테고리 목록 조회 실패 시 재시도
+  void _retryCategories() {
+    setState(() {
+      _categoriesFuture = _fetchCategories();
+    });
+  }
+
+  // 현재 하트 상태에 따라 등록 또는 해제
+  Future<void> _toggleFavorite(AllMenuScreenModel menu) async {
+    final menuId = menu.menuId;
+
+    if (_updatingMenuIds.contains(menuId)) {
+      return;
+    }
+
+    final wasFavorite = _favoriteMenuIds.contains(menuId);
+
+    setState(() {
+      _updatingMenuIds.add(menuId);
+    });
+
+    try {
+      if (wasFavorite) {
+        await _likeService.removeFavorite(menuId);
+      } else {
+        await _likeService.addFavorite(menuId);
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      // 서버 요청 성공 후에만 하트 상태 변경
+      setState(() {
+        if (wasFavorite) {
+          _favoriteMenuIds.remove(menuId);
+        } else {
+          _favoriteMenuIds.add(menuId);
+        }
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      debugPrint('즐겨찾기 변경 실패: $error');
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            wasFavorite
+                ? '즐겨찾기를 해제하지 못했어요. 다시 시도해 주세요.'
+                : '즐겨찾기를 등록하지 못했어요. 다시 시도해 주세요.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _updatingMenuIds.remove(menuId);
+        });
+      }
+    }
+  }
+
+  // 공통코드 API 응답으로 카테고리 버튼 생성
+  Widget _buildCategoryFilters() {
+    return FutureBuilder<List<Code>>(
+      future: _categoriesFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const SizedBox(
+            height: 48,
+            child: Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              children: [
+                const Expanded(child: Text('카테고리를 불러오지 못했어요.')),
+                TextButton(
+                  onPressed: _retryCategories,
+                  child: const Text('다시 시도'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final categories = snapshot.data ?? [];
+
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Row(
+            children: [
+              // 전체는 카테고리 검색 조건을 해제하는 버튼
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  label: const Text('전체'),
+                  selected: _selectedCategory.isEmpty,
+                  onSelected: (selected) {
+                    if (selected) {
+                      _selectCategory('');
+                    }
+                  },
+                ),
+              ),
+              for (final category in categories)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(category.codeName),
+                    selected: _selectedCategory == category.codeId,
+                    onSelected: (selected) {
+                      if (selected) {
+                        _selectCategory(category.codeId);
+                      }
+                    },
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Widget _imagePlaceholder() {
@@ -100,7 +294,9 @@ class _AllMenuScreenState extends State<AllMenuScreen> {
               height: 72,
               fit: BoxFit.cover,
               loadingBuilder: (context, child, progress) {
-                if (progress == null) return child;
+                if (progress == null) {
+                  return child;
+                }
 
                 return const SizedBox(
                   width: 72,
@@ -118,24 +314,18 @@ class _AllMenuScreenState extends State<AllMenuScreen> {
   }
 
   Widget _buildMenuCard(AllMenuScreenModel menu) {
-    // API에서 받은 한글 카테고리 이름 사용
+    // 음식 카드에는 메뉴 API의 categoryName을 사용
     final categoryName = menu.categoryName?.trim() ?? '';
     final description = menu.description?.trim() ?? '';
+
+    final isFavorite = _favoriteMenuIds.contains(menu.menuId);
+    final isUpdating = _updatingMenuIds.contains(menu.menuId);
 
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () {
-          // 선택한 메뉴 ID를 레시피 화면에 전달
-          Navigator.push(
-            context,
-            MaterialPageRoute<void>(
-              builder: (_) =>
-                  RecipeScreen(menuId: menu.menuId, menuName: menu.menuName),
-            ),
-          );
-        },
+        onTap: () => _openRecipe(menu),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
@@ -181,7 +371,20 @@ class _AllMenuScreenState extends State<AllMenuScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.chevron_right),
+              IconButton(
+                tooltip: isFavorite ? '즐겨찾기 해제' : '즐겨찾기 등록',
+                onPressed: isUpdating ? null : () => _toggleFavorite(menu),
+                icon: isUpdating
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        isFavorite ? Icons.favorite : Icons.favorite_border,
+                        color: isFavorite ? Colors.red : Colors.black45,
+                      ),
+              ),
             ],
           ),
         ),
@@ -190,11 +393,9 @@ class _AllMenuScreenState extends State<AllMenuScreen> {
   }
 
   Widget _buildMenuList() {
-    // API의 로딩·실패·성공에 맞는 화면 표시
     return FutureBuilder<List<AllMenuScreenModel>>(
       future: _menusFuture,
       builder: (context, snapshot) {
-        // 새 검색 중에는 이전 목록 대신 로딩 표시
         if (snapshot.connectionState != ConnectionState.done) {
           return const Center(child: CircularProgressIndicator());
         }
@@ -212,7 +413,7 @@ class _AllMenuScreenState extends State<AllMenuScreen> {
                     color: Colors.black54,
                   ),
                   const SizedBox(height: 12),
-                  const Text('메뉴를 불러오지 못했어요.'),
+                  const Text('메뉴 또는 즐겨찾기를 불러오지 못했어요.'),
                   const SizedBox(height: 16),
                   FilledButton(onPressed: _search, child: const Text('다시 시도')),
                 ],
@@ -228,14 +429,14 @@ class _AllMenuScreenState extends State<AllMenuScreen> {
             child: Padding(
               padding: EdgeInsets.all(24),
               child: Text(
-                '검색 결과가 없습니다.\n검색어나 카테고리를 변경해보세요.',
+                '검색 결과가 없습니다.\n'
+                '검색어나 카테고리를 변경해보세요.',
                 textAlign: TextAlign.center,
               ),
             ),
           );
         }
 
-        // 필요한 목록 항목을 생성하며 스크롤 제공
         return ListView.separated(
           padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
           itemCount: menus.length,
@@ -279,27 +480,7 @@ class _AllMenuScreenState extends State<AllMenuScreen> {
                 ),
               ),
             ),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
-                children: [
-                  for (final category in _categories.entries)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        label: Text(category.value),
-                        selected: _selectedCategory == category.key,
-                        onSelected: (selected) {
-                          if (selected) {
-                            _selectCategory(category.key);
-                          }
-                        },
-                      ),
-                    ),
-                ],
-              ),
-            ),
+            _buildCategoryFilters(),
             const SizedBox(height: 20),
             Expanded(child: _buildMenuList()),
           ],
