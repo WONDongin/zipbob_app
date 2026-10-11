@@ -4,10 +4,11 @@ import '../models/code.dart';
 import '../models/menu_filter.dart';
 import '../services/code_service.dart';
 import '../services/menu_filter_service.dart';
-import '../utils/menu_filter_utils.dart';
-import '../widgets/filter_chip_button.dart';
+import '../services/recommend_service.dart';
+import '../utils/menu_filter_utils.dart'; //메뉴 필터링 로직
+import '../widgets/filter_chip_button.dart'; //필터 버튼 UI
 
-import 'recommend_result_screen.dart';
+import 'recommend_result_screen.dart'; //추천메뉴결과
 
 class FilterScreen extends StatefulWidget {
   const FilterScreen({super.key});
@@ -55,6 +56,11 @@ class _FilterScreenState extends State<FilterScreen> {
   //
   // 음식 특징은 OR 조건
   final Set<String> selectedFeatureIds = {};
+
+  // 선택된 값 넘기기 위한 서비스, 로딩 셋팅
+  final RecommendService _recommendService = RecommendService();
+
+  bool isRequestingRecommendation = false;
 
   // ============================================================
   // 화면 상태
@@ -158,22 +164,45 @@ class _FilterScreenState extends State<FilterScreen> {
   // 추천 결과 화면
   // ============================================================
 
-  void _goToRecommendResult() {
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) =>
-            RecommendResultScreen(
+  Future<void> _goToRecommendResult() async {
+  if (isRequestingRecommendation) return;
 
-          category: selectedCategoryId,
+  setState(() {
+    isRequestingRecommendation = true;
+  });
 
-          features:
-              selectedFeatureIds.toList(),
-        ),
+  try {
+    // 선택한 카테고리와 태그를 백엔드로 전송
+    final result = await _recommendService.getRecommendations(
+      category: selectedCategoryId,
+      tags: selectedFeatureIds.toList(),
+    );
+
+    if (!mounted) return;
+
+    // 백엔드에서 받은 추천 메뉴 확인
+    debugPrint('추천 메뉴: $result');
+
+    // TODO: result를 추천 결과 화면으로 전달
+    // 다음 단계에서 RecommendResultScreen에 연결하면 돼.
+  } catch (e) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('추천 가능한 메뉴가 없어요.: $e'),
       ),
     );
+  } finally {
+    if (mounted) {
+      setState(() {
+        isRequestingRecommendation = false;
+      });
+    }
   }
+}
+
 
   // ============================================================
   // 화면
@@ -256,12 +285,14 @@ class _FilterScreenState extends State<FilterScreen> {
                           height: 16,
                         ),
 
-                        ElevatedButton(
-                          onPressed:
-                              _loadData,
-                          child:
-                              const Text(
-                            '다시 불러오기',
+                        ElevatedButton( //추천 버튼
+                          onPressed: filteredMenus.isEmpty || isRequestingRecommendation
+                            ? null
+                            : _goToRecommendResult,
+                          child: Text(
+                            isRequestingRecommendation
+                                ? '추천 중...'
+                                : '추천하기',
                           ),
                         ),
                       ],
