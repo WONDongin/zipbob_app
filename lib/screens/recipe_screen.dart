@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../services/like_service.dart';
+import '../services/recent_recipe_service.dart';
 
 class RecipeScreen extends StatefulWidget {
   const RecipeScreen({
@@ -41,6 +42,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
       : 'http://10.0.2.2:8080';
 
   final _likeService = LikeService();
+  final _recentRecipeService = RecentRecipeService();
 
   late Future<Map<String, dynamic>> _menuFuture;
 
@@ -50,8 +52,14 @@ class _RecipeScreenState extends State<RecipeScreen> {
   // 레시피 및 즐겨찾기 상태 조회 완료 여부
   bool _isReady = false;
 
-  // 등록·해제 요청 진행 여부
+  // 즐겨찾기 등록·해제 요청 진행 여부
   bool _isUpdatingFavorite = false;
+
+  // 현재 화면에서 최근 본 기록 저장에 성공했는지 여부
+  bool _hasRecordedRecent = false;
+
+  // 최근 본 기록 저장 요청 진행 여부
+  bool _isRecordingRecent = false;
 
   @override
   void initState() {
@@ -59,7 +67,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
     _menuFuture = _fetchMenu();
   }
 
-  // 레시피와 현재 메뉴의 즐겨찾기 상태 조회
+  // 레시피 조회 → 최근 본 기록 저장 → 즐겨찾기 상태 조회
   Future<Map<String, dynamic>> _fetchMenu() async {
     final uri = Uri.parse('$serverUrl/api/menus/${widget.menuId}');
 
@@ -72,18 +80,56 @@ class _RecipeScreenState extends State<RecipeScreen> {
     final menu =
         jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
 
+    // 조회가 끝나기 전에 화면을 떠난 경우 추가 작업하지 않음
+    if (!mounted) {
+      return menu;
+    }
+
+    // 상세 조회 성공 후 최근 본 기록 저장
+    // 내부에서 오류를 처리하므로 저장 실패해도 상세 조회는 계속 진행
+    await _recordRecentRecipe();
+
+    if (!mounted) {
+      return menu;
+    }
+
     final favorites = await _likeService.fetchFavorites();
 
     if (mounted) {
       setState(() {
-        // 현재 메뉴의 ID가 즐겨찾기 목록에 포함됐는지 확인
         _isFavorite = favorites.any((item) => item.menuId == widget.menuId);
-
         _isReady = true;
       });
     }
 
     return menu;
+  }
+
+  // 현재 화면에서 최근 본 기록을 한 번 저장
+  Future<void> _recordRecentRecipe() async {
+    if (!mounted || _hasRecordedRecent || _isRecordingRecent) {
+      return;
+    }
+
+    setState(() {
+      _isRecordingRecent = true;
+    });
+
+    try {
+      await _recentRecipeService.recordView(widget.menuId);
+
+      // 성공한 경우에만 기록 완료 처리
+      _hasRecordedRecent = true;
+    } catch (error) {
+      // 최근 본 기록 실패가 레시피 표시를 막지 않도록 처리
+      debugPrint('최근 본 레시피 기록 저장 실패: $error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRecordingRecent = false;
+        });
+      }
+    }
   }
 
   void _retry() {
@@ -278,8 +324,8 @@ class _RecipeScreenState extends State<RecipeScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope<void>(
-      // 변경 요청이 끝나기 전에 이전 화면이 재조회하지 않도록 처리
-      canPop: !_isUpdatingFavorite,
+      // 서버 변경이 완료된 뒤 이전 화면에서 목록을 다시 조회하도록 처리
+      canPop: !_isUpdatingFavorite && !_isRecordingRecent,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('레시피'),
@@ -300,7 +346,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                       color: !_isReady
                           ? Colors.black26
                           : _isFavorite
-                          ? Colors.red
+                          ? const Color(0xFFEF7544)
                           : Colors.black45,
                     ),
             ),

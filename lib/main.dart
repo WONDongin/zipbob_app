@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'dart:ui' show PointerDeviceKind;
+
 import 'models/user_device_model.dart';
 import 'screens/home_screen.dart';
 import 'services/user_device_service.dart';
@@ -20,9 +22,30 @@ class ZipbobApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
+        fontFamily: 'GmarketSans',
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFEF7544)),
         scaffoldBackgroundColor: const Color(0xFFFFFAF5),
       ),
+      // 웹에서도 마우스로 누르고 끌어서 스크롤 가능
+      scrollBehavior: const MaterialScrollBehavior().copyWith(
+        dragDevices: {
+          ...const MaterialScrollBehavior().dragDevices,
+          PointerDeviceKind.mouse,
+        },
+      ),
+
+      // 전체 페이지를 모바일 화면 폭으로 제한
+      builder: (context, child) {
+        return ColoredBox(
+          color: const Color(0xFFF0ECE8),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 430),
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
+        );
+      },
       home: const UserDeviceStartup(),
     );
   }
