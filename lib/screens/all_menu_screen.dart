@@ -9,7 +9,14 @@ import 'recipe_screen.dart';
 
 // 전체 메뉴 화면
 class AllMenuScreen extends StatefulWidget {
-  const AllMenuScreen({super.key});
+  const AllMenuScreen({
+    super.key,
+    this.initialKeyword = '',
+    this.initialCategory = '',
+  });
+
+  final String initialKeyword;
+  final String initialCategory;
 
   @override
   State<AllMenuScreen> createState() => _AllMenuScreenState();
@@ -40,6 +47,9 @@ class _AllMenuScreenState extends State<AllMenuScreen> {
   @override
   void initState() {
     super.initState();
+
+    _searchController.text = widget.initialKeyword.trim();
+    _selectedCategory = widget.initialCategory;
 
     _categoriesFuture = _fetchCategories();
     _menusFuture = _fetchMenus();
@@ -85,7 +95,7 @@ class _AllMenuScreenState extends State<AllMenuScreen> {
   // 처음에는 메뉴 목록과 즐겨찾기 상태를 함께 조회한다.
   // 이후 검색에서는 메뉴 목록만 다시 조회한다.
   Future<List<AllMenuScreenModel>> _fetchMenus() async {
-    final keyword = _searchController.text;
+    final keyword = _searchController.text.trim();
     final category = _selectedCategory;
 
     if (_favoritesLoaded) {
@@ -129,6 +139,7 @@ class _AllMenuScreenState extends State<AllMenuScreen> {
     });
   }
 
+  // 검색어를 지우고 현재 카테고리로 다시 조회
   void _clearSearch() {
     _searchController.clear();
     _search();
@@ -272,6 +283,7 @@ class _AllMenuScreenState extends State<AllMenuScreen> {
     );
   }
 
+  // 이미지가 없거나 로딩에 실패했을 때 표시
   Widget _imagePlaceholder() {
     return Container(
       width: 72,
