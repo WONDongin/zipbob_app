@@ -10,6 +10,7 @@ import 'all_menu_screen.dart';
 import 'favorites_screen.dart';
 import 'filter_screen.dart';
 import 'recipe_screen.dart';
+import 'signup_screen.dart';
 
 // 홈 화면
 class HomeScreen extends StatefulWidget {
@@ -700,6 +701,15 @@ class _HomeScreenState extends State<HomeScreen> {
           semanticLabel: '집밥PICK',
         ),
         actions: [
+          IconButton(
+            tooltip: '회원가입',
+            onPressed: () => _openScreen(const SignupScreen()),
+            icon: const Icon(
+              Icons.person_add_alt_1_outlined,
+              size: 27,
+              color: Color(0xFF222222),
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: IconButton(
