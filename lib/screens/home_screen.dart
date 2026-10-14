@@ -6,6 +6,9 @@ import '../services/code_service.dart';
 import '../services/all_menu_screen_service.dart';
 import '../services/like_service.dart';
 import '../services/recent_recipe_service.dart';
+import '../services/auth_service.dart';
+import 'login_screen.dart';
+import 'account_screen.dart';
 import 'all_menu_screen.dart';
 import 'favorites_screen.dart';
 import 'filter_screen.dart';
@@ -701,14 +704,27 @@ class _HomeScreenState extends State<HomeScreen> {
           semanticLabel: '집밥PICK',
         ),
         actions: [
-          IconButton(
-            tooltip: '회원가입',
-            onPressed: () => _openScreen(const SignupScreen()),
-            icon: const Icon(
-              Icons.person_add_alt_1_outlined,
-              size: 27,
-              color: Color(0xFF222222),
-            ),
+          ListenableBuilder(
+            listenable: AuthService.instance,
+            builder: (context, _) {
+              final loggedIn = AuthService.instance.hasSession;
+
+              return IconButton(
+                tooltip: loggedIn ? '내 정보' : '로그인',
+                onPressed: () => _openScreen(
+                  loggedIn ? const AccountScreen() : const LoginScreen(),
+                ),
+                icon: Icon(
+                  loggedIn
+                      ? Icons.account_circle
+                      : Icons.person_outline_rounded,
+                  size: 27,
+                  color: loggedIn
+                      ? const Color(0xFFEF7544)
+                      : const Color(0xFF222222),
+                ),
+              );
+            },
           ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
