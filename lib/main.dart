@@ -5,6 +5,7 @@ import 'dart:ui' show PointerDeviceKind;
 import 'models/user_device_model.dart';
 import 'screens/home_screen.dart';
 import 'services/user_device_service.dart';
+import 'services/auth_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -68,12 +69,12 @@ class _UserDeviceStartupState extends State<UserDeviceStartup> {
     super.initState();
 
     // 화면 생성 시 한 번 호출
-    _registration = _service.register();
+    _registration = _initialize();
   }
 
   void _retry() {
     setState(() {
-      _registration = _service.register();
+      _registration = _initialize();
     });
   }
 
@@ -111,5 +112,17 @@ class _UserDeviceStartupState extends State<UserDeviceStartup> {
         return const HomeScreen();
       },
     );
+  }
+
+  Future<UserDeviceModel> _initialize() async {
+    final device = await _service.register();
+
+    try {
+      await AuthService.instance.restore();
+    } catch (_) {
+      // 인증 복원에 실패해도 비회원 기능은 이용 가능
+    }
+
+    return device;
   }
 }
