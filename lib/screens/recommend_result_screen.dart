@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'filter_screen.dart';
@@ -26,6 +27,11 @@ class _RecommendResultScreenState
     extends State<RecommendResultScreen> {
   static const Color primaryColor = Color(0xFFB45A30);
 
+  // 백엔드 서버 주소
+  static const String serverUrl = kIsWeb
+      ? 'http://localhost:8080'
+      : 'http://10.0.2.2:8080';
+
   final Random _random = Random();
 
   late int _currentIndex;
@@ -34,8 +40,10 @@ class _RecommendResultScreenState
   void initState() {
     super.initState();
 
-    // 화면에 처음 들어올 때 랜덤 메뉴 선택
-    _currentIndex = _random.nextInt(widget.menus.length);
+    // 추천 메뉴가 있을 때만 랜덤으로 메뉴 선택
+    _currentIndex = widget.menus.isEmpty
+        ? 0
+        : _random.nextInt(widget.menus.length);
   }
 
   // 다시 추천: 현재 메뉴와 다른 메뉴를 우선 선택
@@ -65,26 +73,89 @@ class _RecommendResultScreenState
     final rawTags = menu['tags'];
 
     if (rawTags is List) {
-      return rawTags.map((tag) {
-        // tags가 [{tagName: ...}] 형태인 경우
-        if (tag is Map) {
-          return tag['tagName']?.toString() ?? '';
-        }
+      return rawTags
+          .map((tag) {
+            // tags가 [{tagName: ...}] 형태인 경우
+            if (tag is Map) {
+              return tag['tagName']?.toString() ?? '';
+            }
 
-        // tags가 문자열 리스트인 경우도 처리
-        return tag.toString();
-      }).where((tag) => tag.isNotEmpty).toList();
+            // tags가 문자열 리스트인 경우
+            return tag.toString();
+          })
+          .where((tag) => tag.isNotEmpty)
+          .toList();
     }
 
     return [];
   }
 
+  // 이미지 주소 만들기
+  String? _getImageUrl(String? imagePath) {
+    if (imagePath == null || imagePath.trim().isEmpty) {
+      return null;
+    }
+
+    final path = imagePath.trim();
+
+    // 이미 전체 주소라면 그대로 사용
+    if (path.startsWith('http://') ||
+        path.startsWith('https://')) {
+      return path;
+    }
+
+    // 상대 경로 앞에 백엔드 주소 추가
+    return '$serverUrl${path.startsWith('/') ? '' : '/'}$path';
+  }
+
+  // 이미지가 없거나 로딩에 실패했을 때 표시할 화면
+  Widget _buildImagePlaceholder() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: const Color(0xFFFFE7D2),
+      alignment: Alignment.center,
+      child: const Icon(
+        Icons.restaurant,
+        size: 100,
+        color: primaryColor,
+      ),
+    );
+  }
+
+  // 메뉴 이미지 표시
+  Widget _buildMenuImage(String? imagePath) {
+    final imageUrl = _getImageUrl(imagePath);
+
+    // 이미지 주소가 없으면 기본 아이콘 표시
+    if (imageUrl == null) {
+      return _buildImagePlaceholder();
+    }
+
+    return Image.network(
+      imageUrl,
+      width: double.infinity,
+      height: double.infinity,
+      fit: BoxFit.cover,
+
+      // 이미지 요청에 실패해도 기존 화면 유지
+      errorBuilder: (context, error, stackTrace) {
+        debugPrint('메뉴 이미지 로딩 실패: $imageUrl');
+        debugPrint('오류 내용: $error');
+
+        return _buildImagePlaceholder();
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // 안전하게 빈 리스트 처리
+    // 추천 메뉴가 없는 경우
     if (widget.menus.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text('오늘의 추천')),
+        appBar: AppBar(
+          title: const Text('오늘의 추천'),
+        ),
         body: const Center(
           child: Text('추천할 메뉴가 없습니다.'),
         ),
@@ -104,6 +175,9 @@ class _RecommendResultScreenState
 
     final String? imageUrl =
         currentMenu['imageUrl']?.toString();
+        debugPrint('선택 메뉴: $menuName');
+        debugPrint('이미지 경로: $imageUrl');
+        //debugPrint('최종 이미지 URL: ${_getImageUrl(imageUrl)}');
 
     final menuTags = _getMenuTags(currentMenu);
 
@@ -111,19 +185,26 @@ class _RecommendResultScreenState
     final displayTags = <String>[
       if (categoryName.isNotEmpty) categoryName,
       ...widget.features,
-    ].where((tag) => tag.isNotEmpty && tag != '전체').toSet().toList();
+    ]
+        .where((tag) => tag.isNotEmpty && tag != '전체')
+        .toSet()
+        .toList();
 
     return Scaffold(
       backgroundColor: Colors.white,
+
       appBar: AppBar(
         title: const Text(
           '오늘의 추천',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
         ),
         elevation: 0,
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF2C3539),
       ),
+
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(
@@ -180,39 +261,14 @@ class _RecommendResultScreenState
                     children: [
                       // 메뉴 이미지
                       Expanded(
-                        child: Container(
-                          width: double.infinity,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFFFE7D2),
-                            borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(18),
-                            ),
+                        child: ClipRRect(
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(18),
                           ),
-                          child: imageUrl != null &&
-                                  imageUrl.isNotEmpty
-                              ? ClipRRect(
-                                  borderRadius:
-                                      const BorderRadius.vertical(
-                                    top: Radius.circular(18),
-                                  ),
-                                  child: Image.network(
-                                    imageUrl,
-                                    fit: BoxFit.cover,
-                                    errorBuilder:
-                                        (context, error, stackTrace) {
-                                      return const Icon(
-                                        Icons.restaurant,
-                                        size: 100,
-                                        color: primaryColor,
-                                      );
-                                    },
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.restaurant,
-                                  size: 100,
-                                  color: primaryColor,
-                                ),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: _buildMenuImage(imageUrl),
+                          ),
                         ),
                       ),
 
@@ -229,7 +285,9 @@ class _RecommendResultScreenState
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
+
                             const SizedBox(height: 8),
+
                             if (description.isNotEmpty)
                               Text(
                                 description,
@@ -238,6 +296,7 @@ class _RecommendResultScreenState
                                   color: Colors.grey,
                                 ),
                               ),
+
                             if (menuTags.isNotEmpty) ...[
                               const SizedBox(height: 8),
                               Text(
@@ -268,6 +327,7 @@ class _RecommendResultScreenState
                       context,
                       MaterialPageRoute(
                         builder: (context) => RecipeScreen(
+                          menuId: currentMenu['menuId'] as int,
                           menuName: menuName,
                         ),
                       ),
@@ -302,7 +362,9 @@ class _RecommendResultScreenState
                       child: OutlinedButton(
                         onPressed: _reRecommend,
                         style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: primaryColor),
+                          side: const BorderSide(
+                            color: primaryColor,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -318,7 +380,9 @@ class _RecommendResultScreenState
                       ),
                     ),
                   ),
+
                   const SizedBox(width: 12),
+
                   Expanded(
                     child: SizedBox(
                       height: 50,
@@ -333,7 +397,9 @@ class _RecommendResultScreenState
                           );
                         },
                         style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: primaryColor),
+                          side: const BorderSide(
+                            color: primaryColor,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'home_screen.dart';
 import '../models/code.dart';
 import '../models/menu_filter.dart';
 import '../services/code_service.dart';
@@ -206,7 +207,10 @@ class _FilterScreenState extends State<FilterScreen> {
         builder: (context) => RecommendResultScreen(
           menus: menus,
           category: selectedCategoryId,
-          features: selectedFeatureIds.toList(),
+          features: features
+          .where((feature) => selectedFeatureIds.contains(feature.codeId))
+          .map((feature) => feature.codeName)
+          .toList(),
         ),
       ),
     );
@@ -247,6 +251,18 @@ class _FilterScreenState extends State<FilterScreen> {
       // ========================================================
 
       appBar: AppBar(
+        leading: IconButton(  //뒤로가기 홈으로 이동(이전페이지X) 26.10.17
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const HomeScreen(),
+              ),
+              (route) => false,
+            );
+          },
+        ),
 
         title: const Text(
           '조건 골라 추천',
