@@ -173,7 +173,7 @@ class _FilterScreenState extends State<FilterScreen> {
   });
 
   try {
-    // 선택한 카테고리와 태그를 백엔드로 전송
+    // 1. 선택한 카테고리와 태그를 백엔드로 전송
     final result = await _recommendService.getRecommendations(
       category: selectedCategoryId,
       tags: selectedFeatureIds.toList(),
@@ -184,8 +184,32 @@ class _FilterScreenState extends State<FilterScreen> {
     // 백엔드에서 받은 추천 메뉴 확인
     debugPrint('추천 메뉴: $result');
 
-    // TODO: result를 추천 결과 화면으로 전달
-    // 다음 단계에서 RecommendResultScreen에 연결하면 돼.
+    // 2. 추천 결과가 없는 경우
+    if (result.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('선택한 조건에 맞는 메뉴가 없어요.'),
+        ),
+      );
+      return;
+    }
+
+    // 3. 백엔드 응답을 메뉴 Map 리스트로 변환
+    final menus = result.map((item) {
+      return Map<String, dynamic>.from(item as Map);
+    }).toList();
+
+    // 4. 추천 결과 화면으로 이동하면서 메뉴 리스트 전달
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RecommendResultScreen(
+          menus: menus,
+          category: selectedCategoryId,
+          features: selectedFeatureIds.toList(),
+        ),
+      ),
+    );
   } catch (e) {
     if (!mounted) return;
 

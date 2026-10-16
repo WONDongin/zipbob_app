@@ -1,165 +1,253 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+
 import 'filter_screen.dart';
 import 'recipe_screen.dart';
 
 class RecommendResultScreen extends StatefulWidget {
+  final List<Map<String, dynamic>> menus;
   final String? category;
   final List<String> features;
 
   const RecommendResultScreen({
     super.key,
-    this.category = '한식',
-    this.features = const ['매운', '찌개'],
+    required this.menus,
+    this.category,
+    this.features = const [],
   });
 
   @override
-  State<RecommendResultScreen> createState() => _RecommendResultScreenState();
+  State<RecommendResultScreen> createState() =>
+      _RecommendResultScreenState();
 }
 
-class _RecommendResultScreenState extends State<RecommendResultScreen> {
-  // 예시 데이터 리스트
-  final List<Map<String, dynamic>> _sampleData = [
-    {
-      'name': '김치찌개',
-      'tags': ['한식', '매운', '찌개'],
-      'icon': Icons.soup_kitchen,
-    },
-    {
-      'name': '부대찌개',
-      'tags': ['한식', '고기', '찌개'],
-      'icon': Icons.soup_kitchen,
-    },
-    {
-      'name': '떡볶이',
-      'tags': ['분식', '매운', '떡'],
-      'icon': Icons.ramen_dining,
-    },
-  ];
+class _RecommendResultScreenState
+    extends State<RecommendResultScreen> {
+  static const Color primaryColor = Color(0xFFB45A30);
 
-  int _currentIndex = 0;
+  final Random _random = Random();
 
-  // '다시 추천' 클릭 시 동작
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // 화면에 처음 들어올 때 랜덤 메뉴 선택
+    _currentIndex = _random.nextInt(widget.menus.length);
+  }
+
+  // 다시 추천: 현재 메뉴와 다른 메뉴를 우선 선택
   void _reRecommend() {
+    if (widget.menus.length <= 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('추천할 수 있는 메뉴가 하나뿐이에요.'),
+        ),
+      );
+      return;
+    }
+
     setState(() {
-      _currentIndex = (_currentIndex + 1) % _sampleData.length;
+      int nextIndex;
+
+      do {
+        nextIndex = _random.nextInt(widget.menus.length);
+      } while (nextIndex == _currentIndex);
+
+      _currentIndex = nextIndex;
     });
+  }
+
+  // 현재 메뉴의 태그 이름 목록
+  List<String> _getMenuTags(Map<String, dynamic> menu) {
+    final rawTags = menu['tags'];
+
+    if (rawTags is List) {
+      return rawTags.map((tag) {
+        // tags가 [{tagName: ...}] 형태인 경우
+        if (tag is Map) {
+          return tag['tagName']?.toString() ?? '';
+        }
+
+        // tags가 문자열 리스트인 경우도 처리
+        return tag.toString();
+      }).where((tag) => tag.isNotEmpty).toList();
+    }
+
+    return [];
   }
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFB45A30);
-    final currentMenu = _sampleData[_currentIndex];
+    // 안전하게 빈 리스트 처리
+    if (widget.menus.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('오늘의 추천')),
+        body: const Center(
+          child: Text('추천할 메뉴가 없습니다.'),
+        ),
+      );
+    }
 
-    // 선택된 태그 목록 (전달받은 태그 or 메뉴 태그)
-    final List<String> displayTags = widget.features.isNotEmpty
-    ? [
-        if (widget.category != null) widget.category!,
-        ...widget.features,
-      ]
-    : (currentMenu['tags'] as List<String>);
+    final currentMenu = widget.menus[_currentIndex];
+
+    final String menuName =
+        currentMenu['menuName']?.toString() ?? '이름 없는 메뉴';
+
+    final String categoryName =
+        currentMenu['categoryName']?.toString() ?? '';
+
+    final String description =
+        currentMenu['description']?.toString() ?? '';
+
+    final String? imageUrl =
+        currentMenu['imageUrl']?.toString();
+
+    final menuTags = _getMenuTags(currentMenu);
+
+    // 화면 상단에 표시할 선택 조건
+    final displayTags = <String>[
+      if (categoryName.isNotEmpty) categoryName,
+      ...widget.features,
+    ].where((tag) => tag.isNotEmpty && tag != '전체').toSet().toList();
 
     return Scaffold(
       backgroundColor: Colors.white,
-      // 상단 AppBar (홈/필터 화면과 디자인 통일)
       appBar: AppBar(
         title: const Text(
           '오늘의 추천',
-          style: TextStyle(fontWeight: FontWeight.bold/*, color: Colors.white*/),
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        //backgroundColor: const Color(0xFF2C3539),
         elevation: 0,
-        //iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF2C3539),
       ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 20,
+          ),
           child: Column(
             children: [
-              // 1. 상단 선택 조건 태그 칩들
+              // 선택 조건 표시
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
-                  children: displayTags
-                      .where((tag) => tag != '전체')
-                      .map(
-                        (tag) => Padding(
-                          padding: const EdgeInsets.only(right: 8.0),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: primaryColor,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              tag,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
+                  children: displayTags.map((tag) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: primaryColor,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          tag,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
                           ),
                         ),
-                      )
-                      .toList(),
+                      ),
+                    );
+                  }).toList(),
                 ),
               ),
 
               const SizedBox(height: 20),
 
-              // 2, 5. 메인 추천 음식 카드
+              // 추천 메뉴 카드
               Expanded(
                 child: Container(
                   width: double.infinity,
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.grey.shade300, width: 1.5),
+                    border: Border.all(
+                      color: Colors.grey.shade300,
+                      width: 1.5,
+                    ),
                   ),
                   child: Column(
                     children: [
-                      // 음식 이미지 상단 영역
+                      // 메뉴 이미지
                       Expanded(
                         child: Container(
                           width: double.infinity,
                           decoration: const BoxDecoration(
-                            color: Color(0xFFFFE7D2), // HomeScreen 이미지 배경색과 동일
+                            color: Color(0xFFFFE7D2),
                             borderRadius: BorderRadius.vertical(
                               top: Radius.circular(18),
                             ),
                           ),
-                          child: Icon(
-                            currentMenu['icon'] as IconData,
-                            size: 100,
-                            color: const Color(0xFFB45A30),
-                          ),
+                          child: imageUrl != null &&
+                                  imageUrl.isNotEmpty
+                              ? ClipRRect(
+                                  borderRadius:
+                                      const BorderRadius.vertical(
+                                    top: Radius.circular(18),
+                                  ),
+                                  child: Image.network(
+                                    imageUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder:
+                                        (context, error, stackTrace) {
+                                      return const Icon(
+                                        Icons.restaurant,
+                                        size: 100,
+                                        color: primaryColor,
+                                      );
+                                    },
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.restaurant,
+                                  size: 100,
+                                  color: primaryColor,
+                                ),
                         ),
                       ),
 
-                      // 음식 이름 및 상세 태그
+                      // 메뉴 이름 및 설명
                       Padding(
-                        padding: const EdgeInsets.all(20.0),
+                        padding: const EdgeInsets.all(20),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              currentMenu['name'] as String,
+                              menuName,
                               style: const TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             const SizedBox(height: 8),
-                            Text(
-                              (currentMenu['tags'] as List<String>).join('  '),
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey,
+                            if (description.isNotEmpty)
+                              Text(
+                                description,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey,
+                                ),
                               ),
-                            ),
+                            if (menuTags.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                menuTags.join('  '),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -170,7 +258,7 @@ class _RecommendResultScreenState extends State<RecommendResultScreen> {
 
               const SizedBox(height: 24),
 
-              // 3. 레시피 보기 버튼 -> RecipeScreen으로 이동
+              // 레시피 보기
               SizedBox(
                 width: double.infinity,
                 height: 54,
@@ -180,7 +268,7 @@ class _RecommendResultScreenState extends State<RecommendResultScreen> {
                       context,
                       MaterialPageRoute(
                         builder: (context) => RecipeScreen(
-                          menuName: currentMenu['name'] as String,
+                          menuName: menuName,
                         ),
                       ),
                     );
@@ -205,10 +293,9 @@ class _RecommendResultScreenState extends State<RecommendResultScreen> {
 
               const SizedBox(height: 12),
 
-              // 4. 하단 버튼 2개 (다시 추천 / 조건 변경)
+              // 다시 추천 / 조건 변경
               Row(
                 children: [
-                  // 다시 추천
                   Expanded(
                     child: SizedBox(
                       height: 50,
@@ -232,8 +319,6 @@ class _RecommendResultScreenState extends State<RecommendResultScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-
-                  // 조건 변경 -> filter_screen.dart로 이동
                   Expanded(
                     child: SizedBox(
                       height: 50,
@@ -242,7 +327,8 @@ class _RecommendResultScreenState extends State<RecommendResultScreen> {
                           Navigator.pushReplacement(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const FilterScreen(),
+                              builder: (context) =>
+                                  const FilterScreen(),
                             ),
                           );
                         },
