@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'filter_screen.dart';
 import 'recipe_screen.dart';
 
+//추천 결과 화면
 class RecommendResultScreen extends StatefulWidget {
   final List<Map<String, dynamic>> menus;
   final String? category;

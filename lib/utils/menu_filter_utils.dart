@@ -1,5 +1,6 @@
 import '../models/menu_filter.dart';
 
+//filter_screen.dart 페이지  연결된 메뉴 필터링
 class MenuFilterUtils {
 
   // ============================================================

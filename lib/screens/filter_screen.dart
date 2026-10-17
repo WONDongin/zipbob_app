@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 
-import 'home_screen.dart';
-import '../models/code.dart';
-import '../models/menu_filter.dart';
-import '../services/code_service.dart';
-import '../services/menu_filter_service.dart';
-import '../services/recommend_service.dart';
+import 'home_screen.dart'; //홈화면
+import '../models/code.dart'; // 값 받아오기
+import '../models/menu_filter.dart'; //메뉴 값 받아오기
+import '../services/code_service.dart'; //카테고리, 음식특징 api
+import '../services/menu_filter_service.dart'; //메뉴& 음식특징 리스트 api
+import '../services/recommend_service.dart'; // 조건 api 넘기기
 import '../utils/menu_filter_utils.dart'; //메뉴 필터링 로직
 import '../widgets/filter_chip_button.dart'; //필터 버튼 UI
 
 import 'recommend_result_screen.dart'; //추천메뉴결과
 
+//조건골라 추천 화면
 class FilterScreen extends StatefulWidget {
   const FilterScreen({super.key});
 

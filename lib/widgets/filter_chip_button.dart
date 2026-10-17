@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+//filter_screen.dart 페이지 연결된 버튼
 class FilterChipButton extends StatelessWidget {
   final String label;
   final bool isSelected;

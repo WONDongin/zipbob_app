@@ -1,3 +1,4 @@
+// 메뉴&음식특징 값 받아오기
 class MenuFilter {
   final int menuId;
   final String menuName;
@@ -22,7 +23,7 @@ class MenuFilter {
       category: json['category'],
       categoryName: json['categoryName'],
       description: json['description'],
-      tags: (json['tags'] as List<dynamic>?)
+      tags: (json['tags'] as List<dynamic>?) //이중배열
               ?.map((tag) => MenuTag.fromJson(tag))
               .toList() ??
           [],
@@ -30,7 +31,7 @@ class MenuFilter {
   }
 }
 
-
+//음식특징 배열
 class MenuTag {
   final String tagSeq;
   final String codeId;

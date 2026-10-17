@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+//조건 넘겨서 메뉴리스트 받아오기
 class RecommendService {
   static const String serverUrl = kIsWeb
       ? 'http://localhost:8080'

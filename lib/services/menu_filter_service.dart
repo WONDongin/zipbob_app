@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/menu_filter.dart';
 
+//메뉴+음식특징 전체 api
 class MenuFilterService {
 
   // 웹: localhost

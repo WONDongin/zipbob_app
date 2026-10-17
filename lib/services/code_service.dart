@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/code.dart';
 
+//카테고리, 음식특징 api
 class CodeService {
 
   static const String baseUrl = kIsWeb

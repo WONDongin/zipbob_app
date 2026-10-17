@@ -7,6 +7,8 @@ import '../services/all_menu_screen_service.dart';
 import '../services/like_service.dart';
 import '../services/recent_recipe_service.dart';
 import '../services/auth_service.dart';
+import '../services/recommend_service.dart'; // 조건 api 넘기기 작성자:sun - 26.10.17
+import 'recommend_result_screen.dart'; //아무거나 추천 결과 페이지 - 26.10.17 sun
 import 'login_screen.dart';
 import 'account_screen.dart';
 import 'all_menu_screen.dart';
@@ -28,6 +30,8 @@ class _HomeScreenState extends State<HomeScreen> {
   final CodeService _codeService = CodeService();
   final LikeService _likeService = LikeService();
   final RecentRecipeService _recentRecipeService = RecentRecipeService();
+   // 선택된 값 넘기기 위한 서비스, 로딩 셋팅 - 26.10.17 sun
+  final RecommendService _recommendService = RecommendService();
 
   late Future<List<Code>> _categoriesFuture;
   late Future<List<AllMenuScreenModel>> _favoritesFuture;
@@ -128,6 +132,65 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openMenuSearch() {
     _openScreen(AllMenuScreen(initialKeyword: _searchController.text.trim()));
   }
+
+  // 전체 메뉴 중에서 랜덤 추천 - 26.10.174 sun
+  Future<void> _openRandomRecommendation() async {
+    FocusScope.of(context).unfocus();
+
+    try {
+      // 서버에서 전체 메뉴 추천 목록 조회
+      final response = await _recommendService.getRecommendations(
+        category: null,
+        tags: [],
+      );
+
+      // 서버 응답 확인
+      debugPrint('===== 전체 메뉴 추천 API 응답 =====');
+      debugPrint('응답 메뉴 개수: ${response.length}');
+
+      for (final menu in response) {
+        debugPrint('메뉴 데이터: $menu');
+      }
+
+      debugPrint('===== 응답 확인 끝 =====');
+
+      if (!mounted) return;
+
+      // List<dynamic>을 List<Map<String, dynamic>>으로 변환
+      final List<Map<String, dynamic>> menus = response
+          .map((menu) => Map<String, dynamic>.from(menu as Map))
+          .toList();
+
+      if (menus.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('추천할 메뉴가 없어요.')),
+        );
+        return;
+      }
+
+      // 추천 결과 화면으로 이동
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute<void>(
+          builder: (_) => RecommendResultScreen(
+            menus: menus,
+            category: null,
+            features: const [],
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      debugPrint('랜덤 추천 오류: $e');
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('메뉴 추천에 실패했어요. 다시 시도해 주세요.'),
+        ),
+      );
+    }
+  } //아무거나 추천 end
 
   // 선택한 카테고리로 전체 메뉴 화면 이동
   void _openCategory(String categoryId) {
@@ -837,8 +900,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: FilledButton(
-                          onPressed: () => moveTo(context, '오늘의 추천'),
+                        child: FilledButton( //오늘의 추천
+                          onPressed: _openRandomRecommendation,
                           style: FilledButton.styleFrom(
                             backgroundColor: const Color(0xFFEF7544),
                             foregroundColor: Colors.white,

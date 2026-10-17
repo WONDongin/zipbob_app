@@ -1,3 +1,4 @@
+// 카테고리, 음식특징 값 받아오기
 class Code {
   final String codeId;
   final String codeName;
