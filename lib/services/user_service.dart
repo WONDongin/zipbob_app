@@ -13,12 +13,14 @@ class SignupException implements Exception {
 
 class UserService {
   Future<String> signup({
+    // required : 호출 시 매개변수를 빠뜨리지 않도록 하는 Dart 문법
     required String userId,
     required String userPw,
     required String userPwConfirm,
     required String userName,
     required String email,
     required String emailAdr,
+    required String verificationToken,
   }) async {
     // 앱 시작 시 이미 등록한 기기 정보 사용
     final device = UserDeviceService.currentDevice;
@@ -39,6 +41,7 @@ class UserService {
             'email': email.trim().toLowerCase(),
             'emailAdr': emailAdr.trim().toLowerCase(),
             'userDeviceId': device.userDeviceId,
+            'verificationToken': verificationToken,
           }),
         )
         .timeout(const Duration(seconds: 15));
