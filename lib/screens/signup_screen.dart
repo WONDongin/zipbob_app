@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import '../services/user_service.dart';
 import '../services/email_verification_service.dart';
 
+// 회원가입 화면
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
 
