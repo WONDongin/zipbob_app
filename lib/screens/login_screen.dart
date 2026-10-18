@@ -5,8 +5,9 @@ import 'package:flutter/services.dart';
 
 import '../services/auth_service.dart';
 import 'signup_screen.dart';
+import 'account_recovery_screen.dart';
 
-// 로그인 화면 : 아이디·비밀번호 입력, 로그인 요청, 회원가입 이동
+// 로그인 화면
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -41,6 +42,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // 로그인
   Future<void> _submit() async {
     if (_submitting || !_formKey.currentState!.validate()) return;
 
@@ -61,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       setState(() => _submitting = false);
 
-      // 뒤로 이동 허용 상태가 반영된 뒤 화면 닫기
+      // PopScope에 뒤로 이동 허용 상태가 반영된 뒤 화면 종료
       await WidgetsBinding.instance.endOfFrame;
 
       if (!mounted) return;
@@ -81,7 +83,9 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (_) {
       if (mounted) {
-        setState(() => _error = '로그인을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.');
+        setState(() {
+          _error = '로그인을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.';
+        });
       }
     } finally {
       if (mounted) {
@@ -90,6 +94,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // 회원가입 화면 이동
   Future<void> _openSignup() async {
     final completed = await Navigator.push<bool>(
       context,
@@ -100,6 +105,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('회원가입이 완료됐어요. 가입한 계정으로 로그인해 주세요.')),
+    );
+  }
+
+  // 아이디 찾기·비밀번호 재설정 화면 이동
+  Future<void> _openRecovery({required bool resetPassword}) async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => AccountRecoveryScreen(resetPassword: resetPassword),
+      ),
     );
   }
 
@@ -198,6 +213,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 36),
+
                       const Text(
                         '아이디',
                         style: TextStyle(
@@ -227,6 +243,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         },
                       ),
                       const SizedBox(height: 22),
+
                       const Text(
                         '비밀번호',
                         style: TextStyle(
@@ -250,7 +267,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           suffix: IconButton(
                             tooltip: _hidePassword ? '비밀번호 표시' : '비밀번호 숨기기',
                             onPressed: () {
-                              setState(() => _hidePassword = !_hidePassword);
+                              setState(() {
+                                _hidePassword = !_hidePassword;
+                              });
                             },
                             icon: Icon(
                               _hidePassword
@@ -275,6 +294,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         },
                       ),
                       const SizedBox(height: 24),
+
                       if (_error != null) ...[
                         Semantics(
                           liveRegion: true,
@@ -296,6 +316,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 16),
                       ],
+
                       FilledButton(
                         onPressed: _submitting ? null : _submit,
                         style: FilledButton.styleFrom(
@@ -323,6 +344,27 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
                       ),
+
+                      // 아이디 찾기·비밀번호 재설정
+                      const SizedBox(height: 12),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        children: [
+                          TextButton(
+                            onPressed: _submitting
+                                ? null
+                                : () => _openRecovery(resetPassword: false),
+                            child: const Text('아이디 찾기'),
+                          ),
+                          TextButton(
+                            onPressed: _submitting
+                                ? null
+                                : () => _openRecovery(resetPassword: true),
+                            child: const Text('비밀번호 재설정'),
+                          ),
+                        ],
+                      ),
+
                       const SizedBox(height: 18),
                       Wrap(
                         alignment: WrapAlignment.center,
@@ -350,6 +392,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ],
                       ),
+
                       const SizedBox(height: 36),
                       const Text(
                         '고민은 짧게, 집밥은 맛있게',

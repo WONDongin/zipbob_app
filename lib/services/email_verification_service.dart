@@ -5,14 +5,14 @@ import 'package:http/http.dart' as http;
 
 import 'user_device_service.dart';
 
-// 이메일 인증 API에서 발생한 오류
+// 이메일 인증 API 오류
 class EmailVerificationException implements Exception {
   final String message;
 
   const EmailVerificationException(this.message);
 }
 
-// 인증번호 발송 성공 결과
+// 인증번호 발송 결과
 class EmailVerificationSent {
   final int id;
   final int expiresInSeconds;
@@ -20,7 +20,7 @@ class EmailVerificationSent {
   const EmailVerificationSent(this.id, this.expiresInSeconds);
 }
 
-// 인증번호 확인 성공 결과
+// 인증번호 확인 결과
 class EmailVerificationConfirmed {
   final String token;
   final int expiresInSeconds;
@@ -33,17 +33,17 @@ class EmailVerificationService {
   Future<EmailVerificationSent> send({
     required String email,
     required String emailAdr,
+    String purpose = 'SIGNUP',
   }) async {
     final body = await _post('/send', {
       'email': email.trim().toLowerCase(),
       'emailAdr': emailAdr.trim().toLowerCase(),
-      'purpose': 'SIGNUP',
+      'purpose': purpose,
     });
 
     final id = body['emailVerificationId'];
     final seconds = body['expiresInSeconds'];
 
-    // 서버 응답에 필요한 값이 들어 있는지 확인
     if (id is! int || id <= 0 || seconds is! int || seconds < 0) {
       throw const EmailVerificationException('인증 발송 응답을 확인하지 못했어요.');
     }
@@ -73,13 +73,12 @@ class EmailVerificationService {
     return EmailVerificationConfirmed(token, seconds);
   }
 
-  // 인증 API 공통 POST 요청
+  // 이메일 인증 API 공통 요청
   Future<Map<String, dynamic>> _post(
     String path,
     Map<String, dynamic> data,
   ) async {
     try {
-      // 비회원 API이므로 로그인 토큰을 보내지 않음
       final response = await http
           .post(
             Uri.parse(
@@ -100,7 +99,7 @@ class EmailVerificationService {
           body = decoded;
         }
       } on FormatException {
-        // HTML 등 비정상 응답을 그대로 화면에 노출하지 않음
+        // JSON이 아닌 응답이면 기본 안내 문구 사용
       }
 
       if (response.statusCode == 200 && body != null) {

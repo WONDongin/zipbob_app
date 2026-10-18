@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import '../services/like_service.dart';
 import '../services/recent_recipe_service.dart';
 
+// 레시피 상세 화면
 class RecipeScreen extends StatefulWidget {
   const RecipeScreen({
     super.key,
