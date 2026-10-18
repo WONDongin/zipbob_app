@@ -30,7 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final CodeService _codeService = CodeService();
   final LikeService _likeService = LikeService();
   final RecentRecipeService _recentRecipeService = RecentRecipeService();
-   // 선택된 값 넘기기 위한 서비스, 로딩 셋팅 - 26.10.17 sun
+  // 선택된 값 넘기기 위한 서비스, 로딩 셋팅 - 26.10.17 sun
   final RecommendService _recommendService = RecommendService();
 
   late Future<List<Code>> _categoriesFuture;
@@ -162,22 +162,14 @@ class _HomeScreenState extends State<HomeScreen> {
           .toList();
 
       if (menus.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('추천할 메뉴가 없어요.')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('추천할 메뉴가 없어요.')));
         return;
       }
 
       // 추천 결과 화면으로 이동
-      await Navigator.push<void>(
-        context,
-        MaterialPageRoute<void>(
-          builder: (_) => RecommendResultScreen(
-            menus: menus,
-            category: null,
-            features: const [],
-          ),
-        ),
+      await _openScreen(
+        RecommendResultScreen(menus: menus, category: null, features: const []),
       );
     } catch (e) {
       if (!mounted) return;
@@ -185,9 +177,7 @@ class _HomeScreenState extends State<HomeScreen> {
       debugPrint('랜덤 추천 오류: $e');
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('메뉴 추천에 실패했어요. 다시 시도해 주세요.'),
-        ),
+        const SnackBar(content: Text('메뉴 추천에 실패했어요. 다시 시도해 주세요.')),
       );
     }
   } //아무거나 추천 end
@@ -900,7 +890,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: FilledButton( //오늘의 추천
+                        child: FilledButton(
+                          //오늘의 추천
                           onPressed: _openRandomRecommendation,
                           style: FilledButton.styleFrom(
                             backgroundColor: const Color(0xFFEF7544),
