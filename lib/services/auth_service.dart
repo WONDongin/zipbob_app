@@ -78,6 +78,10 @@ class AuthService extends ChangeNotifier {
   Future<void> _storageQueue = Future<void>.value();
 
   int _generation = 0;
+
+  // 이전 회원 조회가 변경된 닉네임을 덮어쓰지 않도록 관리
+  int _profileRevision = 0;
+
   bool _loggingOut = false;
 
   bool get hasSession => _tokens != null;
@@ -149,6 +153,7 @@ class AuthService extends ChangeNotifier {
 
     _tokens = tokens;
     _user = user;
+    _profileRevision++;
 
     notifyListeners();
   }
@@ -156,6 +161,7 @@ class AuthService extends ChangeNotifier {
   // 현재 로그인한 회원 조회
   Future<AuthUser> getMe() async {
     final generation = _generation;
+    final revision = _profileRevision;
 
     final response = await authenticatedGet('/api/users/me');
     final body = _decode(response);
@@ -166,6 +172,11 @@ class AuthService extends ChangeNotifier {
 
     _checkGeneration(generation);
 
+    // 조회 도중 닉네임 변경이 완료되었다면 최신 정보 유지
+    if (revision != _profileRevision && _user != null) {
+      return _user!;
+    }
+
     final user = AuthUser.fromJson(body);
     _user = user;
 
@@ -174,8 +185,51 @@ class AuthService extends ChangeNotifier {
     return user;
   }
 
+  // 닉네임 변경
+  Future<AuthUser> updateNickname(String userName) async {
+    final generation = _generation;
+
+    final response = await authenticatedPut('/api/users/me/nickname', {
+      'userName': userName.trim(),
+    });
+
+    final body = _decode(response);
+
+    if (response.statusCode != 200) {
+      throw AuthException(_message(body, '닉네임을 변경하지 못했어요.'));
+    }
+
+    _checkGeneration(generation);
+
+    final user = AuthUser.fromJson(body);
+
+    // 서버에서 변경이 완료된 회원 정보 반영
+    _user = user;
+    _profileRevision++;
+
+    notifyListeners();
+
+    return user;
+  }
+
   // 회원 전용 GET 요청
-  Future<http.Response> authenticatedGet(String path) async {
+  Future<http.Response> authenticatedGet(String path) {
+    return _authenticatedRequest(path, (access) => _get(path, access));
+  }
+
+  // 회원 전용 PUT 요청
+  Future<http.Response> authenticatedPut(
+    String path,
+    Map<String, dynamic> body,
+  ) {
+    return _authenticatedRequest(path, (access) => _put(path, access, body));
+  }
+
+  // GET·PUT 공통 인증 처리
+  Future<http.Response> _authenticatedRequest(
+    String path,
+    Future<http.Response> Function(String access) action,
+  ) async {
     if (!path.startsWith('/api/') || path.contains('://')) {
       throw ArgumentError('같은 서버의 /api/ 경로만 사용할 수 있습니다.');
     }
@@ -187,12 +241,12 @@ class AuthService extends ChangeNotifier {
     final generation = _generation;
     final usedAccess = _tokens!.access;
 
-    var response = await _get(path, usedAccess);
+    var response = await action(usedAccess);
 
     _checkGeneration(generation);
 
     if (response.statusCode == 401) {
-      // 다른 요청이 이미 갱신했다면 재발급 없이 새 토큰 사용
+      // 다른 요청이 이미 토큰을 갱신했다면 새 토큰 사용
       if (_tokens?.access == usedAccess) {
         await _refresh();
       }
@@ -203,7 +257,8 @@ class AuthService extends ChangeNotifier {
         throw const AuthException('다시 로그인해 주세요.');
       }
 
-      response = await _get(path, _tokens!.access);
+      // 새 액세스 토큰으로 한 번 재요청
+      response = await action(_tokens!.access);
 
       _checkGeneration(generation);
 
@@ -299,6 +354,7 @@ class AuthService extends ChangeNotifier {
 
       _tokens = null;
       _user = null;
+      _profileRevision++;
 
       notifyListeners();
 
@@ -332,6 +388,7 @@ class AuthService extends ChangeNotifier {
 
     _tokens = null;
     _user = null;
+    _profileRevision++;
 
     notifyListeners();
 
@@ -371,6 +428,20 @@ class AuthService extends ChangeNotifier {
       () => _client.get(
         Uri.parse('$_baseUrl$path'),
         headers: {..._jsonHeaders, 'Authorization': 'Bearer $access'},
+      ),
+    );
+  }
+
+  Future<http.Response> _put(
+    String path,
+    String access,
+    Map<String, dynamic> body,
+  ) {
+    return _send(
+      () => _client.put(
+        Uri.parse('$_baseUrl$path'),
+        headers: {..._jsonHeaders, 'Authorization': 'Bearer $access'},
+        body: jsonEncode(body),
       ),
     );
   }
