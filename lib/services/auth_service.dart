@@ -77,6 +77,7 @@ class AuthService extends ChangeNotifier {
   Future<void>? _refreshing;
   Future<void> _storageQueue = Future<void>.value();
 
+  // 로그인 시도·로그아웃·인증 만료 정리를 구분하는 값
   int _generation = 0;
 
   // 이전 회원 조회가 변경된 닉네임을 덮어쓰지 않도록 관리
@@ -85,7 +86,12 @@ class AuthService extends ChangeNotifier {
   bool _loggingOut = false;
 
   bool get hasSession => _tokens != null;
+
   AuthUser? get user => _user;
+
+  // 화면에서 계정 전환 전후의 비동기 응답을 구분할 때 사용
+  // 토큰 재발급·닉네임 변경만으로는 증가하지 않음
+  int get sessionRevision => _generation;
 
   String get _baseUrl => UserDeviceService.serverUrl;
 
@@ -121,7 +127,7 @@ class AuthService extends ChangeNotifier {
     try {
       await getMe();
     } on AuthException {
-      // 인증 만료는 getMe/재발급에서 정리.
+      // 인증 만료는 회원 조회·토큰 재발급에서 정리.
       // 일시적인 연결 실패는 저장된 토큰 유지.
     }
   }
@@ -203,7 +209,6 @@ class AuthService extends ChangeNotifier {
 
     final user = AuthUser.fromJson(body);
 
-    // 서버에서 변경이 완료된 회원 정보 반영
     _user = user;
     _profileRevision++;
 
@@ -225,7 +230,12 @@ class AuthService extends ChangeNotifier {
     return _authenticatedRequest(path, (access) => _put(path, access, body));
   }
 
-  // GET·PUT 공통 인증 처리
+  // 회원 전용 DELETE 요청
+  Future<http.Response> authenticatedDelete(String path) {
+    return _authenticatedRequest(path, (access) => _delete(path, access));
+  }
+
+  // GET·PUT·DELETE 공통 인증 처리
   Future<http.Response> _authenticatedRequest(
     String path,
     Future<http.Response> Function(String access) action,
@@ -395,7 +405,7 @@ class AuthService extends ChangeNotifier {
     await _save(null, clearedGeneration);
   }
 
-  // 저장·삭제 순서 보장
+  // 토큰 저장·삭제 순서 보장
   Future<void> _save(_TokenPair? tokens, int generation) {
     final operation = _storageQueue.then((_) async {
       if (generation != _generation) return;
@@ -442,6 +452,15 @@ class AuthService extends ChangeNotifier {
         Uri.parse('$_baseUrl$path'),
         headers: {..._jsonHeaders, 'Authorization': 'Bearer $access'},
         body: jsonEncode(body),
+      ),
+    );
+  }
+
+  Future<http.Response> _delete(String path, String access) {
+    return _send(
+      () => _client.delete(
+        Uri.parse('$_baseUrl$path'),
+        headers: {..._jsonHeaders, 'Authorization': 'Bearer $access'},
       ),
     );
   }

@@ -1,61 +1,46 @@
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
-
 import '../models/all_menu_screen_model.dart';
-import 'user_device_service.dart';
+import 'auth_service.dart';
 
 class RecentRecipeService {
-  // 기기 등록 API에서 받은 서버의 정수 기기 ID 사용
-  int _getUserDeviceId() {
-    final device = UserDeviceService.currentDevice;
+  final AuthService _auth;
 
-    if (device == null) {
-      throw StateError('기기 등록이 완료되지 않았습니다.');
+  RecentRecipeService({AuthService? auth})
+    : _auth = auth ?? AuthService.instance;
+
+  // 현재 회원의 최근 조회 기록 저장·시간 갱신
+  Future<void> recordView(int menuId) async {
+    // 비회원의 레시피 조회는 허용하되 기록은 저장하지 않음
+    if (!_auth.hasSession) {
+      return;
     }
 
-    return device.userDeviceId;
-  }
-
-  // 목록 조회·기록 저장 요청에 사용할 URL 생성
-  Uri _buildUri({int? menuId}) {
-    final path = menuId == null
-        ? '/api/recent-recipes'
-        : '/api/recent-recipes/$menuId';
-
-    return Uri.parse(
-      '${UserDeviceService.serverUrl}$path',
-    ).replace(queryParameters: {'userDeviceId': _getUserDeviceId().toString()});
-  }
-
-  // 최근 본 기록 저장 또는 마지막 조회 시간 갱신
-  // PUT /api/recent-recipes/3?userDeviceId=1
-  Future<void> recordView(int menuId) async {
-    final response = await http
-        .put(_buildUri(menuId: menuId))
-        .timeout(const Duration(seconds: 15));
+    final response = await _auth.authenticatedPut(
+      '/api/recent-recipes/$menuId',
+      {},
+    );
 
     if (response.statusCode != 204) {
-      throw Exception('최근 본 레시피 기록 저장 실패: HTTP ${response.statusCode}');
+      throw const AuthException('최근 본 레시피를 기록하지 못했어요.');
     }
   }
 
-  // 기기별 최근 본 레시피 목록 조회
-  // GET /api/recent-recipes?userDeviceId=1
+  // 현재 회원의 최근 본 레시피 목록
   Future<List<AllMenuScreenModel>> fetchRecentRecipes() async {
-    final response = await http
-        .get(_buildUri())
-        .timeout(const Duration(seconds: 15));
-
-    if (response.statusCode != 200) {
-      throw Exception('최근 본 레시피 목록 조회 실패: HTTP ${response.statusCode}');
+    // 비회원은 개인 목록 API를 호출하지 않음
+    if (!_auth.hasSession) {
+      return [];
     }
 
-    // 한글이 깨지지 않도록 UTF-8로 디코딩
+    final response = await _auth.authenticatedGet('/api/recent-recipes');
+
+    if (response.statusCode != 200) {
+      throw const AuthException('최근 본 레시피를 불러오지 못했어요.');
+    }
+
     final body = jsonDecode(utf8.decode(response.bodyBytes)) as List<dynamic>;
 
-    // JSON 목록을 메뉴 모델 목록으로 변환
-    // 서버가 반환한 최신 조회순을 그대로 유지
     return body
         .map(
           (item) => AllMenuScreenModel.fromJson(item as Map<String, dynamic>),

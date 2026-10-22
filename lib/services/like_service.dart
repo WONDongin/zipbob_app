@@ -1,39 +1,24 @@
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
-
 import '../models/all_menu_screen_model.dart';
-import 'user_device_service.dart';
+import 'auth_service.dart';
 
 class LikeService {
-  // 기기 등록 API에서 받은 서버의 정수 기기 ID 사용
-  int _getUserDeviceId() {
-    final device = UserDeviceService.currentDevice;
+  final AuthService _auth;
 
-    if (device == null) {
-      throw StateError('기기 등록이 완료되지 않았습니다.');
+  LikeService({AuthService? auth}) : _auth = auth ?? AuthService.instance;
+
+  // 현재 로그인한 회원의 즐겨찾기 목록
+  Future<List<AllMenuScreenModel>> fetchFavorites() async {
+    // 비회원은 개인 목록 API를 호출하지 않음
+    if (!_auth.hasSession) {
+      return [];
     }
 
-    return device.userDeviceId;
-  }
-
-  // 목록·등록·삭제 요청에 사용할 URL 생성
-  Uri _buildUri({int? menuId}) {
-    final path = menuId == null ? '/api/favorites' : '/api/favorites/$menuId';
-
-    return Uri.parse(
-      '${UserDeviceService.serverUrl}$path',
-    ).replace(queryParameters: {'userDeviceId': _getUserDeviceId().toString()});
-  }
-
-  // 기기별 즐겨찾기 메뉴 목록 조회 : GET /api/favorites?userDeviceId=1
-  Future<List<AllMenuScreenModel>> fetchFavorites() async {
-    final response = await http
-        .get(_buildUri())
-        .timeout(const Duration(seconds: 15));
+    final response = await _auth.authenticatedGet('/api/favorites');
 
     if (response.statusCode != 200) {
-      throw Exception('즐겨찾기 목록 조회 실패: HTTP ${response.statusCode}');
+      throw const AuthException('즐겨찾기 목록을 불러오지 못했어요.');
     }
 
     final body = jsonDecode(utf8.decode(response.bodyBytes)) as List<dynamic>;
@@ -45,25 +30,21 @@ class LikeService {
         .toList();
   }
 
-  // 즐겨찾기 등록 : PUT /api/favorites/1?userDeviceId=1
+  // 현재 회원의 즐겨찾기 등록
   Future<void> addFavorite(int menuId) async {
-    final response = await http
-        .put(_buildUri(menuId: menuId))
-        .timeout(const Duration(seconds: 15));
+    final response = await _auth.authenticatedPut('/api/favorites/$menuId', {});
 
     if (response.statusCode != 204) {
-      throw Exception('즐겨찾기 등록 실패: HTTP ${response.statusCode}');
+      throw const AuthException('즐겨찾기를 저장하지 못했어요.');
     }
   }
 
-  // 즐겨찾기 해제 : DELETE /api/favorites/1?userDeviceId=1
+  // 현재 회원의 즐겨찾기 해제
   Future<void> removeFavorite(int menuId) async {
-    final response = await http
-        .delete(_buildUri(menuId: menuId))
-        .timeout(const Duration(seconds: 15));
+    final response = await _auth.authenticatedDelete('/api/favorites/$menuId');
 
     if (response.statusCode != 204) {
-      throw Exception('즐겨찾기 해제 실패: HTTP ${response.statusCode}');
+      throw const AuthException('즐겨찾기를 해제하지 못했어요.');
     }
   }
 }

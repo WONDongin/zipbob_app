@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
 
-import '../models/code.dart';
 import '../models/all_menu_screen_model.dart';
-import '../services/code_service.dart';
+import '../models/code.dart';
 import '../services/all_menu_screen_service.dart';
+import '../services/auth_service.dart';
+import '../services/code_service.dart';
 import '../services/like_service.dart';
 import '../services/recent_recipe_service.dart';
-import '../services/auth_service.dart';
-import '../services/recommend_service.dart'; // 조건 api 넘기기 작성자:sun - 26.10.17
-import 'recommend_result_screen.dart'; //아무거나 추천 결과 페이지 - 26.10.17 sun
-import 'login_screen.dart';
+import '../services/recommend_service.dart';
+import '../widgets/member_login_card.dart';
 import 'account_screen.dart';
 import 'all_menu_screen.dart';
 import 'favorites_screen.dart';
 import 'filter_screen.dart';
+import 'login_screen.dart';
 import 'recipe_screen.dart';
-import 'signup_screen.dart';
+import 'recommend_result_screen.dart';
 
 // 홈 화면
 class HomeScreen extends StatefulWidget {
@@ -26,59 +26,88 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const Color _primary = Color(0xFFEF7544);
+  static const Color _textColor = Color(0xFF222222);
+
   final TextEditingController _searchController = TextEditingController();
+
+  final AuthService _auth = AuthService.instance;
   final CodeService _codeService = CodeService();
   final LikeService _likeService = LikeService();
   final RecentRecipeService _recentRecipeService = RecentRecipeService();
-  // 선택된 값 넘기기 위한 서비스, 로딩 셋팅 - 26.10.17 sun
   final RecommendService _recommendService = RecommendService();
 
   late Future<List<Code>> _categoriesFuture;
   late Future<List<AllMenuScreenModel>> _favoritesFuture;
   late Future<List<AllMenuScreenModel>> _recentRecipesFuture;
 
-  // 마우스가 올라간 카테고리 코드
+  // 계정이 변경됐는지 구분하는 값.
+  late int _sessionRevision;
+  late bool _hadSession;
+
   String? _hoveredCategoryId;
 
   @override
   void initState() {
     super.initState();
 
-    // 홈 최초 진입 시 각 목록 조회
+    _sessionRevision = _auth.sessionRevision;
+    _hadSession = _auth.hasSession;
+
     _categoriesFuture = _fetchCategories();
     _favoritesFuture = _fetchFavorites();
     _recentRecipesFuture = _fetchRecentRecipes();
+
+    // 로그인·로그아웃·계정 변경 감지.
+    _auth.addListener(_onAuthChanged);
   }
 
   @override
   void dispose() {
+    _auth.removeListener(_onAuthChanged);
     _searchController.dispose();
+
     super.dispose();
   }
 
-  // 기존 공통코드 API 재사용
+  // 로그인 상태가 바뀌면 개인 목록을 새로 조회한다.
+  //
+  // 닉네임 변경이나 토큰 갱신처럼 같은 로그인 세션에서 발생하는
+  // 알림은 개인 목록 재조회 대상에서 제외한다.
+  void _onAuthChanged() {
+    final nextRevision = _auth.sessionRevision;
+    final nextHasSession = _auth.hasSession;
+
+    if (_sessionRevision == nextRevision && _hadSession == nextHasSession) {
+      return;
+    }
+
+    _sessionRevision = nextRevision;
+    _hadSession = nextHasSession;
+
+    _refreshHomeMenus();
+  }
+
   Future<List<Code>> _fetchCategories() {
     return _codeService.getCategoryCodes().timeout(const Duration(seconds: 15));
   }
 
-  // 카테고리 조회 실패 시 재시도
+  Future<List<AllMenuScreenModel>> _fetchFavorites() {
+    // 비회원일 때 서비스에서 빈 목록을 반환한다.
+    // 회원 전용 API 요청은 보내지 않는다.
+    return _likeService.fetchFavorites();
+  }
+
+  Future<List<AllMenuScreenModel>> _fetchRecentRecipes() {
+    return _recentRecipeService.fetchRecentRecipes();
+  }
+
   void _retryCategories() {
     setState(() {
       _categoriesFuture = _fetchCategories();
     });
   }
 
-  // 기존 즐겨찾기 API 재사용
-  Future<List<AllMenuScreenModel>> _fetchFavorites() {
-    return _likeService.fetchFavorites();
-  }
-
-  // 최근 본 레시피 조회
-  Future<List<AllMenuScreenModel>> _fetchRecentRecipes() {
-    return _recentRecipeService.fetchRecentRecipes();
-  }
-
-  // 저장한 메뉴만 새로고침
   void _refreshFavorites() {
     if (!mounted) {
       return;
@@ -89,7 +118,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // 최근 본 레시피만 새로고침
   void _refreshRecentRecipes() {
     if (!mounted) {
       return;
@@ -100,7 +128,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // 홈으로 돌아왔을 때 두 목록 새로고침
   void _refreshHomeMenus() {
     if (!mounted) {
       return;
@@ -112,14 +139,12 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // 이동한 화면에서 돌아오면 홈 목록 갱신
+  // 상세 화면·즐겨찾기 화면 등에서 돌아오면 홈 목록을 갱신한다.
   Future<void> _openScreen(Widget screen) async {
     FocusScope.of(context).unfocus();
 
-    await Navigator.push<void>(
-      context,
-      MaterialPageRoute<void>(builder: (_) => screen),
-    );
+    await Navigator.of(context)
+        .push<void>(MaterialPageRoute<void>(builder: (_) => screen));
 
     if (!mounted) {
       return;
@@ -128,36 +153,42 @@ class _HomeScreenState extends State<HomeScreen> {
     _refreshHomeMenus();
   }
 
-  // 검색어를 전체 메뉴 화면에 전달
   void _openMenuSearch() {
     _openScreen(AllMenuScreen(initialKeyword: _searchController.text.trim()));
   }
 
-  // 전체 메뉴 중에서 랜덤 추천 - 26.10.174 sun
+  void _openCategory(String categoryId) {
+    _openScreen(AllMenuScreen(initialCategory: categoryId));
+  }
+
+  void _openRecipe(AllMenuScreenModel menu) {
+    _openScreen(RecipeScreen(menuId: menu.menuId, menuName: menu.menuName));
+  }
+
+  // 비회원은 로그인 안내, 회원은 즐겨찾기 화면으로 이동.
+  void _openFavorites() {
+    if (!_auth.hasSession) {
+      showMemberLogin(context);
+      return;
+    }
+
+    _openScreen(const FavoritesScreen());
+  }
+
   Future<void> _openRandomRecommendation() async {
     FocusScope.of(context).unfocus();
 
     try {
-      // 서버에서 전체 메뉴 추천 목록 조회
       final response = await _recommendService.getRecommendations(
         category: null,
         tags: [],
       );
 
-      // 서버 응답 확인
-      debugPrint('===== 전체 메뉴 추천 API 응답 =====');
-      debugPrint('응답 메뉴 개수: ${response.length}');
-
-      for (final menu in response) {
-        debugPrint('메뉴 데이터: $menu');
+      if (!mounted) {
+        return;
       }
 
-      debugPrint('===== 응답 확인 끝 =====');
-
-      if (!mounted) return;
-
-      // List<dynamic>을 List<Map<String, dynamic>>으로 변환
-      final List<Map<String, dynamic>> menus = response
+      final menus = response
           .map((menu) => Map<String, dynamic>.from(menu as Map))
           .toList();
 
@@ -167,46 +198,26 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
-      // 추천 결과 화면으로 이동
       await _openScreen(
         RecommendResultScreen(menus: menus, category: null, features: const []),
       );
-    } catch (e) {
-      if (!mounted) return;
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
 
-      debugPrint('랜덤 추천 오류: $e');
+      debugPrint('랜덤 추천 오류: $error');
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('메뉴 추천에 실패했어요. 다시 시도해 주세요.')),
       );
     }
-  } //아무거나 추천 end
-
-  // 선택한 카테고리로 전체 메뉴 화면 이동
-  void _openCategory(String categoryId) {
-    _openScreen(AllMenuScreen(initialCategory: categoryId));
   }
 
-  // 즐겨찾기 화면 이동
-  void _openFavorites() {
-    _openScreen(const FavoritesScreen());
-  }
-
-  // 저장한 메뉴·최근 본 레시피의 상세 화면 이동
-  void _openRecipe(AllMenuScreenModel menu) {
-    _openScreen(RecipeScreen(menuId: menu.menuId, menuName: menu.menuName));
-  }
-
-  // 실제 화면을 만들기 전까지 임시 화면으로 이동
-  void moveTo(BuildContext context, String title) {
-    _openScreen(TemporaryScreen(title: title));
-  }
-
-  // 주황색 아이콘이 있는 영역 제목
   Widget _buildSectionTitle(String title, IconData icon) {
     return Row(
       children: [
-        Icon(icon, size: 21, color: const Color(0xFFEF7544)),
+        Icon(icon, size: 21, color: _primary),
         const SizedBox(width: 8),
         Flexible(
           child: Text(
@@ -215,7 +226,7 @@ class _HomeScreenState extends State<HomeScreen> {
               fontSize: 16,
               fontWeight: FontWeight.w500,
               letterSpacing: -0.5,
-              color: Color(0xFF222222),
+              color: _textColor,
             ),
           ),
         ),
@@ -223,7 +234,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 카테고리 아이콘 그리드
   Widget _buildCategoryGrid() {
     return FutureBuilder<List<Code>>(
       future: _categoriesFuture,
@@ -261,7 +271,6 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         return GridView.builder(
-          // 홈 ListView가 세로 스크롤을 담당
           shrinkWrap: true,
           primary: false,
           physics: const NeverScrollableScrollPhysics(),
@@ -281,18 +290,15 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 카테고리 카드
   Widget _buildCategoryCard(Code category) {
     final isHovered = _hoveredCategoryId == category.codeId;
 
     return Material(
-      color: isHovered ? const Color(0xFFEF7544) : Colors.white,
+      color: isHovered ? _primary : Colors.white,
       animationDuration: const Duration(milliseconds: 150),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
-        side: BorderSide(
-          color: isHovered ? const Color(0xFFEF7544) : const Color(0xFFECE6E0),
-        ),
+        side: BorderSide(color: isHovered ? _primary : const Color(0xFFECE6E0)),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -323,7 +329,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Icon(
                       Icons.restaurant,
                       size: 32,
-                      color: isHovered ? Colors.white : const Color(0xFFEF7544),
+                      color: isHovered ? Colors.white : _primary,
                     ),
                   );
                 },
@@ -339,7 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
-                      color: isHovered ? Colors.white : const Color(0xFF222222),
+                      color: isHovered ? Colors.white : _textColor,
                     ),
                   ),
                 ),
@@ -351,7 +357,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 저장한 메뉴 영역
   Widget _buildSavedMenus() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -364,7 +369,7 @@ class _HomeScreenState extends State<HomeScreen> {
             TextButton(
               onPressed: _openFavorites,
               style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFFEF7544),
+                foregroundColor: _primary,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
               ),
               child: const Row(
@@ -387,6 +392,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 12),
         FutureBuilder<List<AllMenuScreenModel>>(
+          // 계정 변경 시 기존 FutureBuilder의 목록을 재사용하지 않는다.
+          key: ValueKey('favorites-$_sessionRevision-$_hadSession'),
           future: _favoritesFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
@@ -413,26 +420,10 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             }
 
-            // API 응답 순서대로 최대 3개 표시
-            final previewMenus = menus.take(3).toList();
-
-            return SizedBox(
-              height: 190,
-              child: ListView.separated(
-                key: const PageStorageKey<String>('savedMenus'),
-                padding: EdgeInsets.zero,
-                scrollDirection: Axis.horizontal,
-                itemCount: previewMenus.length,
-                separatorBuilder: (_, index) {
-                  return const SizedBox(width: 12);
-                },
-                itemBuilder: (context, index) {
-                  return _buildMenuCard(
-                    previewMenus[index],
-                    showFavoriteBadge: true,
-                  );
-                },
-              ),
+            // 홈에서는 즐겨찾기 최대 3개 미리보기.
+            return _buildHorizontalMenus(
+              menus.take(3).toList(),
+              showFavoriteBadge: true,
             );
           },
         ),
@@ -440,7 +431,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 최근 본 레시피 영역: 전체 보기 버튼 없음
   Widget _buildRecentRecipes() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -448,6 +438,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _buildSectionTitle('최근 본 레시피', Icons.history_rounded),
         const SizedBox(height: 14),
         FutureBuilder<List<AllMenuScreenModel>>(
+          key: ValueKey('recent-$_sessionRevision-$_hadSession'),
           future: _recentRecipesFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
@@ -474,26 +465,10 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             }
 
-            // 서버가 반환한 최신순을 유지하며 최대 5개 표시
-            final recentMenus = menus.take(5).toList();
-
-            return SizedBox(
-              height: 190,
-              child: ListView.separated(
-                key: const PageStorageKey<String>('recentRecipes'),
-                padding: EdgeInsets.zero,
-                scrollDirection: Axis.horizontal,
-                itemCount: recentMenus.length,
-                separatorBuilder: (_, index) {
-                  return const SizedBox(width: 12);
-                },
-                itemBuilder: (context, index) {
-                  return _buildMenuCard(
-                    recentMenus[index],
-                    showFavoriteBadge: false,
-                  );
-                },
-              ),
+            // 백엔드의 최신순을 그대로 사용한다.
+            return _buildHorizontalMenus(
+              menus.take(5).toList(),
+              showFavoriteBadge: false,
             );
           },
         ),
@@ -501,7 +476,29 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 목록 조회 실패 안내
+  Widget _buildHorizontalMenus(
+    List<AllMenuScreenModel> menus, {
+    required bool showFavoriteBadge,
+  }) {
+    return SizedBox(
+      height: 190,
+      child: ListView.separated(
+        padding: EdgeInsets.zero,
+        scrollDirection: Axis.horizontal,
+        itemCount: menus.length,
+        separatorBuilder: (_, index) {
+          return const SizedBox(width: 12);
+        },
+        itemBuilder: (context, index) {
+          return _buildMenuCard(
+            menus[index],
+            showFavoriteBadge: showFavoriteBadge,
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildListError({
     required String message,
     required VoidCallback onRetry,
@@ -524,7 +521,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 기록이 없는 경우 안내
   Widget _buildEmptyMenuList({
     required IconData icon,
     required String title,
@@ -540,7 +536,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Column(
         children: [
-          Icon(icon, size: 34, color: const Color(0xFFEF7544)),
+          Icon(icon, size: 34, color: _primary),
           const SizedBox(height: 12),
           Text(
             title,
@@ -563,7 +559,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 저장한 메뉴·최근 본 레시피 공통 카드
   Widget _buildMenuCard(
     AllMenuScreenModel menu, {
     required bool showFavoriteBadge,
@@ -580,8 +575,6 @@ class _HomeScreenState extends State<HomeScreen> {
             fit: StackFit.expand,
             children: [
               _buildMenuImage(menu.imageUrl),
-
-              // 메뉴명이 잘 보이도록 하단 그라데이션
               const Positioned.fill(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
@@ -598,8 +591,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-
-              // 저장한 메뉴에만 즐겨찾기 표시
               if (showFavoriteBadge)
                 Positioned(
                   top: 8,
@@ -613,12 +604,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: const Icon(
                       Icons.favorite,
                       size: 19,
-                      color: Color(0xFFEF7544),
+                      color: _primary,
                     ),
                   ),
                 ),
-
-              // 메뉴명
               Positioned(
                 left: 10,
                 right: 10,
@@ -651,15 +640,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 메뉴 카드 이미지
   Widget _buildMenuImage(String? imageUrl) {
     final resolvedUrl = AllMenuScreenService.resolveImageUrl(imageUrl);
 
     const placeholder = ColoredBox(
       color: Color(0xFFFFE7D2),
-      child: Center(
-        child: Icon(Icons.restaurant, size: 40, color: Color(0xFFEF7544)),
-      ),
+      child: Center(child: Icon(Icons.restaurant, size: 40, color: _primary)),
     );
 
     if (resolvedUrl == null || resolvedUrl.isEmpty) {
@@ -682,10 +668,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: SizedBox(
               width: 24,
               height: 24,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Color(0xFFEF7544),
-              ),
+              child: CircularProgressIndicator(strokeWidth: 2, color: _primary),
             ),
           ),
         );
@@ -694,12 +677,187 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 홈 화면의 끝을 알려주는 푸터
+  Widget _buildSearchField() {
+    return TextField(
+      controller: _searchController,
+      textInputAction: TextInputAction.search,
+      onSubmitted: (_) => _openMenuSearch(),
+      style: const TextStyle(
+        fontSize: 15,
+        letterSpacing: -0.5,
+        color: _textColor,
+      ),
+      decoration: InputDecoration(
+        hintText: '어떤 메뉴를 찾고 있나요?',
+        hintStyle: const TextStyle(fontSize: 14, color: Color(0xFF858585)),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 18,
+        ),
+        prefixIcon: IconButton(
+          tooltip: '전체 메뉴 검색',
+          onPressed: _openMenuSearch,
+          icon: const Icon(Icons.search, size: 26, color: Color(0xFF666666)),
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFFE2DEDA)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFFE2DEDA)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: _primary, width: 1.5),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecommendButtons() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Material(
+          color: _primary,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: _openRandomRecommendation,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              child: Row(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: const Color(0x26FFFFFF),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(
+                      Icons.casino_rounded,
+                      size: 28,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '아무거나 추천',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.6,
+                            color: Colors.white,
+                          ),
+                        ),
+                        SizedBox(height: 7),
+                        Text(
+                          '고민될 땐, 오늘의 한 끼를 골라드려요.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            height: 1.6,
+                            letterSpacing: -0.4,
+                            color: Color(0xFFFFEBDD),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 24,
+                    color: Color(0xFFFFEBDD),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Material(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: Color(0xFFF0E5DC)),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => _openScreen(const FilterScreen()),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              child: Row(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFEEE5),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(
+                      Icons.tune_rounded,
+                      size: 28,
+                      color: _primary,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '조건 골라 추천',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.6,
+                            color: _textColor,
+                          ),
+                        ),
+                        SizedBox(height: 7),
+                        Text(
+                          '먹고 싶은 종류와 특징으로 찾아보세요.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            height: 1.6,
+                            letterSpacing: -0.4,
+                            color: Color(0xFF78716B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 24,
+                    color: _primary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildFooter() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-      color: const Color(0xFFEF7544),
+      color: _primary,
       child: const Column(
         children: [
           Row(
@@ -738,7 +896,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // 왼쪽 로고, 오른쪽 즐겨찾기
       appBar: AppBar(
         automaticallyImplyLeading: false,
         centerTitle: false,
@@ -758,23 +915,23 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           ListenableBuilder(
-            listenable: AuthService.instance,
+            listenable: _auth,
             builder: (context, _) {
-              final loggedIn = AuthService.instance.hasSession;
+              final loggedIn = _auth.hasSession;
 
               return IconButton(
                 tooltip: loggedIn ? '내 정보' : '로그인',
-                onPressed: () => _openScreen(
-                  loggedIn ? const AccountScreen() : const LoginScreen(),
-                ),
+                onPressed: () {
+                  _openScreen(
+                    loggedIn ? const AccountScreen() : const LoginScreen(),
+                  );
+                },
                 icon: Icon(
                   loggedIn
                       ? Icons.account_circle
                       : Icons.person_outline_rounded,
                   size: 27,
-                  color: loggedIn
-                      ? const Color(0xFFEF7544)
-                      : const Color(0xFF222222),
+                  color: loggedIn ? _primary : _textColor,
                 ),
               );
             },
@@ -782,39 +939,36 @@ class _HomeScreenState extends State<HomeScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: IconButton(
+              tooltip: '즐겨찾기',
+              onPressed: _openFavorites,
               icon: const Icon(
                 Icons.favorite_border,
                 size: 30,
-                color: Color(0xFF222222),
+                color: _textColor,
               ),
-              tooltip: '즐겨찾기',
-              onPressed: _openFavorites,
             ),
           ),
         ],
       ),
       body: SafeArea(
         child: ListView(
-          // 푸터가 앱 화면 양옆까지 채워지도록 전체 패딩 제거
           padding: EdgeInsets.zero,
           children: [
-            // 본문에만 여백 적용
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // 메인 문구
                   const Text.rich(
                     TextSpan(
                       children: [
                         TextSpan(
                           text: '오늘 ',
-                          style: TextStyle(color: Color(0xFF222222)),
+                          style: TextStyle(color: _textColor),
                         ),
                         TextSpan(
                           text: '뭐 먹지?',
-                          style: TextStyle(color: Color(0xFFEF7544)),
+                          style: TextStyle(color: _primary),
                         ),
                       ],
                     ),
@@ -834,176 +988,28 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-
-                  // 키보드 검색 또는 돋보기 클릭으로 검색
-                  TextField(
-                    controller: _searchController,
-                    textInputAction: TextInputAction.search,
-                    onSubmitted: (_) => _openMenuSearch(),
-                    style: const TextStyle(
-                      fontSize: 15,
-                      letterSpacing: -0.5,
-                      color: Color(0xFF222222),
-                    ),
-                    decoration: InputDecoration(
-                      hintText: '어떤 메뉴를 찾고 있나요?',
-                      hintStyle: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF858585),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 18,
-                      ),
-                      prefixIcon: IconButton(
-                        tooltip: '전체 메뉴 검색',
-                        onPressed: _openMenuSearch,
-                        icon: const Icon(
-                          Icons.search,
-                          size: 26,
-                          color: Color(0xFF666666),
-                        ),
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: Color(0xFFE2DEDA)),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: Color(0xFFE2DEDA)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(
-                          color: Color(0xFFEF7544),
-                          width: 1.5,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // 추천 버튼
+                  _buildSearchField(),
                   const SizedBox(height: 16),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: FilledButton(
-                          //오늘의 추천
-                          onPressed: _openRandomRecommendation,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFFEF7544),
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size(0, 70),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 16,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.casino, size: 26),
-                              SizedBox(width: 8),
-                              Flexible(
-                                child: Text(
-                                  '아무거나 추천',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => _openScreen(const FilterScreen()),
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFFEEE5),
-                            foregroundColor: const Color(0xFFEF7544),
-                            side: const BorderSide(
-                              color: Color(0xFFEF7544),
-                              width: 1.2,
-                            ),
-                            minimumSize: const Size(0, 70),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 16,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.tune, size: 26),
-                              SizedBox(width: 8),
-                              Flexible(
-                                child: Text(
-                                  '조건 골라 추천',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  // 카테고리 아이콘 그리드
+                  _buildRecommendButtons(),
                   const SizedBox(height: 30),
                   _buildSectionTitle('카테고리', Icons.grid_view_rounded),
                   const SizedBox(height: 14),
                   _buildCategoryGrid(),
-
-                  // 저장한 메뉴 미리보기
                   const SizedBox(height: 30),
-                  _buildSavedMenus(),
 
-                  // 최근 본 레시피
-                  const SizedBox(height: 30),
-                  _buildRecentRecipes(),
+                  // 개인 영역은 회원에게만 표시한다.
+                  if (_auth.hasSession) ...[
+                    _buildSavedMenus(),
+                    const SizedBox(height: 30),
+                    _buildRecentRecipes(),
+                  ] else
+                    const MemberLoginCard(),
                 ],
               ),
             ),
-
-            // 본문 아래에 주황색 푸터 표시
             _buildFooter(),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// 임시 화면
-class TemporaryScreen extends StatelessWidget {
-  const TemporaryScreen({super.key, required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Text('$title 화면 준비 중', style: const TextStyle(fontSize: 20)),
       ),
     );
   }
