@@ -15,38 +15,47 @@ class FilterChipButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFB45A30);
+    const primaryColor = Color(0xFFEF7544);
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: isSelected
-                ? primaryColor
-                : Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isSelected
-                  ? primaryColor
-                  : Colors.grey.shade300,
-              width: 1,
-            ),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: isSelected
+            ? const [
+                BoxShadow(
+                  color: Color(0x20EF7544),
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
+                ),
+              ]
+            : const [],
+      ),
+      child: Material(
+        color: isSelected ? primaryColor : const Color(0xFFFFFAF5),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(
+            color: isSelected ? primaryColor : const Color(0xFFF0E5DC),
           ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isSelected
-                  ? Colors.white
-                  : const Color(0xFF2C3539),
-              fontWeight: isSelected
-                  ? FontWeight.bold
-                  : FontWeight.w500,
-              fontSize: 14,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+            child: Center(
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : const Color(0xFF78716B),
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 12,
+                  height: 1.4,
+                  letterSpacing: -0.5,
+                ),
+              ),
             ),
           ),
         ),

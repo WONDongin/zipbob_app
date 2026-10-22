@@ -18,6 +18,11 @@ class AccountRecoveryScreen extends StatefulWidget {
 
 class _AccountRecoveryScreenState extends State<AccountRecoveryScreen> {
   static const _orange = Color(0xFFEF7544);
+  static const _background = Color(0xFFFFFAF5);
+  static const _softOrange = Color(0xFFFFEEE5);
+  static const _border = Color(0xFFF0E5DC);
+  static const _titleColor = Color(0xFF222222);
+  static const _bodyColor = Color(0xFF78716B);
 
   final _id = TextEditingController();
   final _email = TextEditingController();
@@ -292,6 +297,54 @@ class _AccountRecoveryScreenState extends State<AccountRecoveryScreen> {
     });
   }
 
+  InputDecoration _inputDecoration({
+    required String label,
+    required IconData icon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      filled: true,
+      fillColor: Colors.white,
+      prefixIcon: Icon(icon, size: 20, color: _orange),
+      labelStyle: const TextStyle(
+        fontSize: 12,
+        letterSpacing: -0.4,
+        color: _bodyColor,
+      ),
+      floatingLabelStyle: const TextStyle(fontSize: 12, color: _orange),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _orange, width: 1.5),
+      ),
+    );
+  }
+
+  ButtonStyle _primaryButtonStyle() {
+    return FilledButton.styleFrom(
+      backgroundColor: _orange,
+      foregroundColor: Colors.white,
+      minimumSize: const Size.fromHeight(52),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      textStyle: const TextStyle(
+        fontFamily: 'GmarketSans',
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.5,
+      ),
+    );
+  }
+
   // 공통 입력창
   Widget _field(
     TextEditingController controller,
@@ -309,11 +362,19 @@ class _AccountRecoveryScreenState extends State<AccountRecoveryScreen> {
         autocorrect: false,
         enableSuggestions: false,
         onChanged: identity ? _invalidate : null,
-        decoration: InputDecoration(
-          labelText: label,
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        cursorColor: _orange,
+        style: const TextStyle(
+          fontSize: 14,
+          letterSpacing: -0.4,
+          color: _titleColor,
+        ),
+        decoration: _inputDecoration(
+          label: label,
+          icon: secret
+              ? Icons.lock_outline_rounded
+              : keyboardType == TextInputType.emailAddress
+              ? Icons.mail_outline_rounded
+              : Icons.person_outline_rounded,
         ),
       ),
     );
@@ -324,105 +385,349 @@ class _AccountRecoveryScreenState extends State<AccountRecoveryScreen> {
     return PopScope(
       canPop: !_busy,
       child: Scaffold(
-        backgroundColor: const Color(0xFFFFFAF5),
+        backgroundColor: _background,
         appBar: AppBar(
-          title: Text(_title),
-          backgroundColor: const Color(0xFFFFFAF5),
+          title: Text(
+            _title,
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w500,
+              letterSpacing: -0.5,
+            ),
+          ),
+          centerTitle: true,
+          backgroundColor: _background,
+          foregroundColor: _titleColor,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
         ),
         body: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
             child: AbsorbPointer(
               absorbing: _busy,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    _title,
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _softOrange,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            widget.resetPassword
+                                ? Icons.lock_reset_rounded
+                                : Icons.manage_search_rounded,
+                            size: 16,
+                            color: _orange,
+                          ),
+                          const SizedBox(width: 6),
+                          const Text(
+                            '계정 찾기',
+                            style: TextStyle(
+                              fontSize: 11,
+                              letterSpacing: -0.4,
+                              color: Color(0xFFAA512B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: widget.resetPassword
+                              ? '비밀번호를\n'
+                              : '잊어버린 아이디,\n',
+                        ),
+                        TextSpan(
+                          text: widget.resetPassword ? '다시 설정해요.' : '함께 찾아볼까요?',
+                          style: const TextStyle(color: _orange),
+                        ),
+                      ],
+                    ),
                     style: const TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: _orange,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      height: 1.45,
+                      letterSpacing: -0.9,
+                      color: _titleColor,
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const Text('회원가입 시 등록한 이메일로 인증해 주세요.'),
-                  const SizedBox(height: 28),
+                  const Text(
+                    '회원가입 시 등록한 이메일로 인증해 주세요.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.8,
+                      letterSpacing: -0.4,
+                      color: _bodyColor,
+                    ),
+                  ),
+                  const SizedBox(height: 26),
 
                   // 최종 처리 전 입력 화면
                   if (!_complete) ...[
-                    if (widget.resetPassword)
-                      _field(_id, '아이디', identity: true),
-
-                    _field(
-                      _email,
-                      '가입 이메일 (예: zipbob@gmail.com)',
-                      identity: true,
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-
-                    OutlinedButton(
-                      onPressed: _busy ? null : _send,
-                      child: Text(
-                        _verificationId == null ? '인증번호 발송' : '인증번호 재발송',
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: _border),
                       ),
-                    ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: _softOrange,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.verified_user_outlined,
+                                  size: 19,
+                                  color: _orange,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              const Expanded(
+                                child: Text(
+                                  '이메일 인증',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: -0.5,
+                                    color: _titleColor,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 22),
 
-                    // 발송 후 인증번호 입력 영역
-                    if (_verificationId != null && _token == null) ...[
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _code,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(6),
+                          if (widget.resetPassword)
+                            _field(_id, '아이디', identity: true),
+
+                          _field(
+                            _email,
+                            '가입 이메일 (예: zipbob@gmail.com)',
+                            identity: true,
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+
+                          OutlinedButton(
+                            onPressed: _busy ? null : _send,
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: _background,
+                              foregroundColor: const Color(0xFFAA512B),
+                              minimumSize: const Size.fromHeight(48),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 14,
+                              ),
+                              side: const BorderSide(color: _border),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              textStyle: const TextStyle(
+                                fontFamily: 'GmarketSans',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: -0.4,
+                              ),
+                            ),
+                            child: Text(
+                              _verificationId == null ? '인증번호 발송' : '인증번호 재발송',
+                            ),
+                          ),
+
+                          // 발송 후 인증번호 입력 영역
+                          if (_verificationId != null && _token == null) ...[
+                            const SizedBox(height: 22),
+                            const Divider(height: 1, color: _border),
+                            const SizedBox(height: 22),
+                            const Text(
+                              '이메일로 받은 번호를 입력해 주세요.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                height: 1.7,
+                                letterSpacing: -0.4,
+                                color: _bodyColor,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            TextField(
+                              controller: _code,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(6),
+                              ],
+                              cursorColor: _orange,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: 4,
+                                color: _titleColor,
+                              ),
+                              decoration: _inputDecoration(
+                                label: '인증번호 6자리',
+                                icon: Icons.password_rounded,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: _busy ? null : _verify,
+                              style: TextButton.styleFrom(
+                                foregroundColor: _orange,
+                                minimumSize: const Size.fromHeight(44),
+                                textStyle: const TextStyle(
+                                  fontFamily: 'GmarketSans',
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.4,
+                                ),
+                              ),
+                              child: const Text('인증번호 확인'),
+                            ),
+                          ],
+
+                          // 인증 완료 후 최종 처리 영역
+                          if (_token != null) ...[
+                            const SizedBox(height: 20),
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: _softOrange,
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(
+                                    Icons.check_circle_outline_rounded,
+                                    size: 20,
+                                    color: _orange,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      '이메일 인증이 완료되었어요.',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        height: 1.6,
+                                        letterSpacing: -0.4,
+                                        color: Color(0xFFAA512B),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+
+                            if (widget.resetPassword) ...[
+                              _field(_password, '새 비밀번호', secret: true),
+                              _field(_confirm, '새 비밀번호 확인', secret: true),
+                            ],
+
+                            FilledButton(
+                              onPressed: _busy ? null : _submit,
+                              style: _primaryButtonStyle(),
+                              child: Text(_title),
+                            ),
+                          ],
                         ],
-                        decoration: const InputDecoration(
-                          labelText: '인증번호 6자리',
-                        ),
                       ),
-                      TextButton(
-                        onPressed: _busy ? null : _verify,
-                        child: const Text('인증번호 확인'),
-                      ),
-                    ],
-
-                    // 인증 완료 후 최종 처리 영역
-                    if (_token != null) ...[
-                      const SizedBox(height: 20),
-
-                      if (widget.resetPassword) ...[
-                        _field(_password, '새 비밀번호', secret: true),
-                        _field(_confirm, '새 비밀번호 확인', secret: true),
-                      ],
-
-                      FilledButton(
-                        onPressed: _busy ? null : _submit,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: _orange,
-                          minimumSize: const Size.fromHeight(52),
-                        ),
-                        child: Text(_title),
-                      ),
-                    ],
+                    ),
                   ],
 
                   // 요청 중 표시
                   if (_busy)
                     const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Center(child: CircularProgressIndicator()),
+                      padding: EdgeInsets.all(20),
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: _orange,
+                          strokeWidth: 3,
+                        ),
+                      ),
                     ),
 
                   // 아이디 찾기 결과
                   if (_foundId != null) ...[
-                    const Text('가입한 아이디', textAlign: TextAlign.center),
-                    SelectableText(
-                      _foundId!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 24, color: _orange),
+                    Container(
+                      padding: const EdgeInsets.all(26),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: _border),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x08000000),
+                            blurRadius: 24,
+                            offset: Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 72,
+                            height: 72,
+                            decoration: const BoxDecoration(
+                              color: _softOrange,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.person_outline_rounded,
+                              size: 36,
+                              color: _orange,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          const Text(
+                            '가입한 아이디',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              letterSpacing: -0.4,
+                              color: _bodyColor,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SelectableText(
+                            _foundId!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 25,
+                              height: 1.5,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.6,
+                              color: _orange,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(height: 20),
                   ],
 
                   // 안내·오류 메시지
@@ -431,9 +736,40 @@ class _AccountRecoveryScreenState extends State<AccountRecoveryScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 20),
                       child: Semantics(
                         liveRegion: true,
-                        child: Text(
-                          _message!,
-                          style: const TextStyle(height: 1.6),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: _softOrange,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFFFDCC9)),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Icon(
+                                  _complete
+                                      ? Icons.check_circle_outline_rounded
+                                      : Icons.info_outline_rounded,
+                                  size: 20,
+                                  color: _orange,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  _message!,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    height: 1.8,
+                                    letterSpacing: -0.4,
+                                    color: Color(0xFFAA512B),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -442,8 +778,21 @@ class _AccountRecoveryScreenState extends State<AccountRecoveryScreen> {
                   if (_complete)
                     FilledButton(
                       onPressed: () => Navigator.pop(context),
+                      style: _primaryButtonStyle(),
                       child: const Text('로그인으로 돌아가기'),
                     ),
+
+                  const SizedBox(height: 28),
+                  const Text(
+                    '고민은 짧게, 집밥은 맛있게',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 11,
+                      height: 1.6,
+                      letterSpacing: -0.4,
+                      color: Color(0xFF99918B),
+                    ),
+                  ),
                 ],
               ),
             ),
