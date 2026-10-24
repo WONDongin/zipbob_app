@@ -615,7 +615,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
               child: Padding(
                 padding: const EdgeInsets.only(top: 3),
                 child: Text(
-                  title ?? '조리 단계 $number',
+                  title ?? '조리 단계',
                   style: const TextStyle(
                     fontSize: 15,
                     height: 1.6,
