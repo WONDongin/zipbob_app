@@ -2,7 +2,6 @@ import '../models/menu_filter.dart';
 
 //filter_screen.dart 페이지  연결된 메뉴 필터링
 class MenuFilterUtils {
-
   // ============================================================
   // 메뉴 필터링
   // ============================================================
@@ -29,7 +28,6 @@ class MenuFilterUtils {
     required Set<String> selectedFeatureIds,
   }) {
     return menus.where((menu) {
-
       // --------------------------------------------------------
       // 1. 카테고리 필터
       // --------------------------------------------------------
@@ -39,8 +37,7 @@ class MenuFilterUtils {
       //
       // null이면 '전체'이므로 필터하지 않는다.
 
-      if (selectedCategoryId != null &&
-          menu.category != selectedCategoryId) {
+      if (selectedCategoryId != null && menu.category != selectedCategoryId) {
         return false;
       }
 
@@ -52,21 +49,16 @@ class MenuFilterUtils {
       // OR 조건으로 필터링한다.
 
       if (selectedFeatureIds.isNotEmpty) {
-
         // 현재 메뉴가 가지고 있는 태그 ID 목록
-        final menuTagIds = menu.tags
-            .map((tag) => tag.codeId)
-            .toSet();
+        final menuTagIds = menu.tags.map((tag) => tag.codeId).toSet();
 
-        // 선택한 특징 중 하나라도 가지고 있는지 확인
-        final hasAnyFeature =
-            selectedFeatureIds.any(
-          (featureId) =>
-              menuTagIds.contains(featureId),
+        // 선택한 특징을 모두 가지고 있는지 확인
+        final hasAllFeatures = selectedFeatureIds.every(
+          (featureId) => menuTagIds.contains(featureId),
         );
 
-        // 선택한 특징을 하나도 가지고 있지 않다면 제외
-        if (!hasAnyFeature) {
+        // 선택한 특징 중 하나라도 없으면 제외
+        if (!hasAllFeatures) {
           return false;
         }
       }
