@@ -8,6 +8,7 @@ import '../services/code_service.dart';
 import '../services/like_service.dart';
 import '../widgets/member_login_card.dart';
 import 'recipe_screen.dart';
+import 'home_screen.dart'; //홈화면
 
 // 전체 메뉴 화면
 class AllMenuScreen extends StatefulWidget {
@@ -820,6 +821,18 @@ class _AllMenuScreenState extends State<AllMenuScreen> {
     return Scaffold(
       backgroundColor: _background,
       appBar: AppBar(
+        leading: IconButton(
+          //뒤로가기 홈으로 이동(이전페이지X) 26.11.03
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
+              (route) => false,
+            );
+          },
+        ),
+
         title: const Text(
           '전체 메뉴',
           style: TextStyle(

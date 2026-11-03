@@ -157,6 +157,11 @@ class _HomeScreenState extends State<HomeScreen> {
     _openScreen(AllMenuScreen(initialKeyword: _searchController.text.trim()));
   }
 
+  // 검색어 지우기
+  void _clearSearch() {
+    _searchController.clear();
+  }
+
   void _openCategory(String categoryId) {
     _openScreen(AllMenuScreen(initialCategory: categoryId));
   }
@@ -700,6 +705,16 @@ class _HomeScreenState extends State<HomeScreen> {
           tooltip: '전체 메뉴 검색',
           onPressed: _openMenuSearch,
           icon: const Icon(Icons.search, size: 26, color: Color(0xFF666666)),
+        ),
+        // 검색어 지우기 버튼
+        suffixIcon: IconButton(
+          tooltip: '검색어 지우기',
+          onPressed: _clearSearch,
+          icon: const Icon(
+            Icons.close_rounded,
+            size: 19,
+            color: Color(0xFFAAA097),
+          ),
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
