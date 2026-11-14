@@ -1,16 +1,12 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/all_menu_screen_model.dart';
+import '../config/api_config.dart';
 
 class AllMenuScreenService {
-  // Chrome: localhost
-  // Android 에뮬레이터: 개발 PC에 접근하는 주소
-  static const String serverUrl = kIsWeb
-      ? 'http://localhost:8080'
-      : 'http://10.0.2.2:8080';
+  static String get serverUrl => ApiConfig.baseUrl;
 
   Future<List<AllMenuScreenModel>> fetchMenus({
     String keyword = '',
