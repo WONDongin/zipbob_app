@@ -31,7 +31,10 @@ class StartupLoadingScreen extends StatelessWidget {
           builder: (context, constraints) {
             return SingleChildScrollView(
               child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                constraints: BoxConstraints(
+                  minWidth: constraints.maxWidth,
+                  minHeight: constraints.maxHeight,
+                ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
