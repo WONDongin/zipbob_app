@@ -1,0 +1,72 @@
+name: Flutter Web CI and Deploy
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flutter-web-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  web:
+    name: Build and deploy web
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      API_BASE_URL: https://zipbob-back.onrender.com
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.5"
+          channel: stable
+          cache: true
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Build Flutter web
+        run: >
+          flutter build web --release
+          --dart-define=API_BASE_URL="$API_BASE_URL"
+
+      - name: Set up Node.js
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Install Vercel CLI
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: npm install --global vercel@65.16.0
+
+      - name: Prepare and deploy to Vercel
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+
+          : "${VERCEL_TOKEN:?Missing VERCEL_TOKEN}"
+          : "${VERCEL_ORG_ID:?Missing VERCEL_ORG_ID}"
+          : "${VERCEL_PROJECT_ID:?Missing VERCEL_PROJECT_ID}"
+
+          vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+          vercel build --prod --token="$VERCEL_TOKEN"
+          vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
