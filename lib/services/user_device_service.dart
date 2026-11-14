@@ -7,22 +7,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/user_device_model.dart';
+import '../config/api_config.dart';
 
 class UserDeviceService {
-  // Chrome: 개발 PC
-  // Android 에뮬레이터: 에뮬레이터에서 개발 PC에 접근
-  // iOS 시뮬레이터: 개발 Mac
-  static String get serverUrl {
-    if (kIsWeb) {
-      return 'http://localhost:8080';
-    }
-
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080';
-    }
-
-    return 'http://localhost:8080';
-  }
+  static String get serverUrl => ApiConfig.baseUrl;
 
   // 로컬 저장소에서 UUID를 찾을 때 사용하는 이름
   static const String _deviceIdKey = 'zipbob_device_id';

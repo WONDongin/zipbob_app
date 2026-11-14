@@ -1,10 +1,10 @@
 import 'dart:math';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'filter_screen.dart';
 import 'recipe_screen.dart';
+import '../config/api_config.dart';
 
 // 추천 결과 화면
 class RecommendResultScreen extends StatefulWidget {
@@ -33,10 +33,7 @@ class _RecommendResultScreenState extends State<RecommendResultScreen> {
   static const Color titleColor = Color(0xFF222222);
   static const Color bodyColor = Color(0xFF78716B);
 
-  // 백엔드 서버 주소 — 기존 유지
-  static const String serverUrl = kIsWeb
-      ? 'http://localhost:8080'
-      : 'http://10.0.2.2:8080';
+  static String get serverUrl => ApiConfig.baseUrl;
 
   final Random _random = Random();
 
